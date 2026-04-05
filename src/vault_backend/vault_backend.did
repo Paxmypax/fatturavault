@@ -1,0 +1,218 @@
+type SecurityState = record {
+  ack_recovery_phrase : bool;
+  ack_backup_device : bool;
+  ack_risk_understood : bool;
+  completed_at_ns : opt nat64;
+  last_reviewed_at_ns : opt nat64;
+};
+
+type UserProfile = record {
+  owner : principal;
+  display_name : opt text;
+  created_at_ns : nat64;
+  updated_at_ns : nat64;
+  security : SecurityState;
+};
+
+type CategoryRecord = record {
+  id : text;
+  owner : principal;
+  is_default : bool;
+  name : text;
+  color : text;
+  icon : text;
+  sort_order : nat32;
+  doc_count : nat64;
+  created_at_ns : nat64;
+  updated_at_ns : nat64;
+};
+
+type NoteRecord = record {
+  id : text;
+  owner : principal;
+  title : text;
+  encrypted_content : blob;
+  pinned : bool;
+  created_at_ns : nat64;
+  updated_at_ns : nat64;
+};
+
+type PostItRecord = record {
+  id : text;
+  owner : principal;
+  encrypted_text : blob;
+  completed : bool;
+  color : text;
+  created_at_ns : nat64;
+  updated_at_ns : nat64;
+};
+
+type DocumentStatus = variant {
+  Inbox;
+  Processed;
+};
+
+type PaymentStatus = variant {
+  Due;
+  Paid;
+};
+
+type InvoiceLineItemRecord = record {
+  description : text;
+  amount : float64;
+  vat_rate : float64;
+};
+
+type InvoiceDataRecord = record {
+  invoice_type : text;
+  invoice_number : opt text;
+  supplier : opt text;
+  vat_number : opt text;
+  net_amount : opt float64;
+  vat_rate : opt float64;
+  vat_amount : opt float64;
+  total_amount : opt float64;
+  line_items : vec InvoiceLineItemRecord;
+};
+
+type WarrantyDataRecord = record {
+  product : opt text;
+  brand : opt text;
+  store : opt text;
+  purchase_date : opt text;
+  duration_months : opt nat32;
+  serial_number : opt text;
+};
+
+type BlobEncryptionMetadataRecord = record {
+  version : nat8;
+  algorithm : text;
+  iv_base64 : text;
+  plaintext_sha256_hex : text;
+  ciphertext_sha256_hex : text;
+  plaintext_size : nat64;
+  ciphertext_size : nat64;
+};
+
+type DocumentCryptoStateRecord = record {
+  scheme : text;
+  wrapped_document_key_base64 : opt text;
+  wrapping_iv_base64 : opt text;
+  key_wrapping : opt text;
+  original : opt BlobEncryptionMetadataRecord;
+  preview : opt BlobEncryptionMetadataRecord;
+};
+
+type VetKeyConfigRecord = record {
+  key_name : text;
+  derivation_context : blob;
+  aes_domain_separator : text;
+};
+
+type DocumentRecord = record {
+  id : text;
+  owner : principal;
+  name : text;
+  size_bytes : nat64;
+  mime_type : text;
+  original_blob_id : opt text;
+  preview_blob_id : opt text;
+  category_id : opt text;
+  category_name : text;
+  title : text;
+  status : DocumentStatus;
+  document_date : opt text;
+  tags : vec text;
+  notes : opt text;
+  merchant_name : opt text;
+  amount : opt float64;
+  payment_status : PaymentStatus;
+  has_expiry : bool;
+  expiry_date : opt text;
+  expiry_type : opt text;
+  expiry_duration : opt text;
+  crypto_state : opt DocumentCryptoStateRecord;
+  invoice_data : opt InvoiceDataRecord;
+  warranty_data : opt WarrantyDataRecord;
+  created_at_ns : nat64;
+  updated_at_ns : nat64;
+};
+
+type DocumentUpsertInput = record {
+  id : opt text;
+  name : text;
+  size_bytes : nat64;
+  mime_type : text;
+  original_blob_id : opt text;
+  preview_blob_id : opt text;
+  category_id : opt text;
+  category_name : text;
+  title : text;
+  status : DocumentStatus;
+  document_date : opt text;
+  tags : vec text;
+  notes : opt text;
+  merchant_name : opt text;
+  amount : opt float64;
+  payment_status : PaymentStatus;
+  has_expiry : bool;
+  expiry_date : opt text;
+  expiry_type : opt text;
+  expiry_duration : opt text;
+  crypto_state : opt DocumentCryptoStateRecord;
+  invoice_data : opt InvoiceDataRecord;
+  warranty_data : opt WarrantyDataRecord;
+  created_at_ns : opt nat64;
+};
+
+type ActivityType = variant {
+  Uploaded;
+  Processed;
+  Updated;
+  Deleted;
+};
+
+type ActivityRecord = record {
+  id : text;
+  owner : principal;
+  activity_type : ActivityType;
+  document_id : text;
+  document_name : text;
+  document_title : opt text;
+  category_name : opt text;
+  at_ns : nat64;
+};
+
+type UserProfileResult = variant { Ok : UserProfile; Err : text };
+type CategoryResult = variant { Ok : CategoryRecord; Err : text };
+type NoteResult = variant { Ok : NoteRecord; Err : text };
+type PostItResult = variant { Ok : PostItRecord; Err : text };
+type DocumentResult = variant { Ok : DocumentRecord; Err : text };
+type VetKeyResult = variant { Ok : blob; Err : text };
+type UnitResult = variant { Ok; Err : text };
+
+service : {
+  get_my_profile : () -> (opt UserProfile) query;
+  get_user_vetkey_config : () -> (VetKeyConfigRecord) query;
+  get_user_vetkey_public_key : () -> (VetKeyResult);
+  get_encrypted_user_vetkey : (blob) -> (VetKeyResult);
+  upsert_my_profile : (opt text, opt SecurityState) -> (UserProfileResult);
+
+  get_my_categories : () -> (vec CategoryRecord) query;
+  add_custom_category : (text, text, text) -> (CategoryResult);
+  update_category : (text, text, text, text) -> (CategoryResult);
+  delete_custom_category : (text) -> (UnitResult);
+
+  list_my_notes : () -> (vec NoteRecord) query;
+  upsert_note : (opt text, text, blob, bool) -> (NoteResult);
+  delete_note : (text) -> (UnitResult);
+
+  list_my_postits : () -> (vec PostItRecord) query;
+  upsert_postit : (opt text, blob, bool, text) -> (PostItResult);
+  delete_postit : (text) -> (UnitResult);
+
+  list_my_documents : () -> (vec DocumentRecord) query;
+  list_my_activities : (opt nat32) -> (vec ActivityRecord) query;
+  upsert_document : (DocumentUpsertInput) -> (DocumentResult);
+  delete_document : (text) -> (UnitResult);
+}

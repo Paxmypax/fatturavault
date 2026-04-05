@@ -1,0 +1,66 @@
+type InboxDocumentStatus = variant {
+  Uploaded;
+  Processing;
+  ReadyForReview;
+  Archived;
+  Error;
+};
+
+type InboxDocumentRecord = record {
+  id : text;
+  owner : principal;
+  name : text;
+  size_bytes : nat64;
+  mime_type : text;
+  source_blob_id : opt text;
+  preview_blob_id : opt text;
+  status : InboxDocumentStatus;
+  ocr_text : opt text;
+  suggested_title : opt text;
+  suggested_category_id : opt text;
+  suggested_category_name : opt text;
+  suggested_tags : vec text;
+  extracted_payload_json : opt text;
+  error_message : opt text;
+  created_at_ns : nat64;
+  updated_at_ns : nat64;
+  expires_at_ns : opt nat64;
+  archived_at_ns : opt nat64;
+};
+
+type InboxDocumentUpsertInput = record {
+  id : opt text;
+  name : text;
+  size_bytes : nat64;
+  mime_type : text;
+  source_blob_id : opt text;
+  preview_blob_id : opt text;
+  status : opt InboxDocumentStatus;
+  expires_at_ns : opt nat64;
+  created_at_ns : opt nat64;
+};
+
+type InboxAiUpdateInput = record {
+  document_id : text;
+  status : InboxDocumentStatus;
+  ocr_text : opt text;
+  suggested_title : opt text;
+  suggested_category_id : opt text;
+  suggested_category_name : opt text;
+  suggested_tags : vec text;
+  extracted_payload_json : opt text;
+  error_message : opt text;
+};
+
+type InboxDocumentResult = variant { Ok : InboxDocumentRecord; Err : text };
+type UnitResult = variant { Ok : null; Err : text };
+
+service : {
+  list_my_inbox_documents : () -> (vec InboxDocumentRecord);
+  get_my_inbox_document : (text) -> (opt InboxDocumentRecord);
+  upsert_inbox_document : (InboxDocumentUpsertInput) -> (InboxDocumentResult);
+  update_inbox_ai_state : (InboxAiUpdateInput) -> (InboxDocumentResult);
+  mark_inbox_document_archived : (text, opt nat64) -> (InboxDocumentResult);
+  delete_inbox_document : (text) -> (UnitResult);
+  purge_my_expired_inbox_documents : (opt nat32) -> (nat32);
+}

@@ -1,0 +1,14 @@
+[package]
+name = "vault_backend"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid.workspace = true
+ic-cdk.workspace = true
+ic-stable-structures.workspace = true
+serde.workspace = true
+fatturavault_shared = { path = "../shared" }

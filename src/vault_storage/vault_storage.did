@@ -1,0 +1,56 @@
+type BlobKind = variant {
+  Original;
+  Preview;
+};
+
+type BlobManifest = record {
+  blob_id : text;
+  owner : principal;
+  document_id : text;
+  kind : BlobKind;
+  mime_type : text;
+  total_size : nat64;
+  chunk_count : nat32;
+  sha256_hex : text;
+  created_at_ns : nat64;
+  finalized : bool;
+};
+
+type BlobCreateInput = record {
+  document_id : text;
+  kind : BlobKind;
+  mime_type : text;
+  total_size : nat64;
+  chunk_count : nat32;
+  sha256_hex : text;
+};
+
+type BlobChunkInput = record {
+  blob_id : text;
+  chunk_index : nat32;
+  bytes : blob;
+};
+
+type StorageError = variant {
+  NotFound;
+  Unauthorized;
+  AlreadyExists;
+  InvalidChunkIndex;
+  InvalidState;
+  InvalidChecksum;
+  TooLarge;
+  Message : text;
+};
+
+type StorageResult = variant { Ok; Err : StorageError };
+type BlobManifestResult = variant { Ok : BlobManifest; Err : StorageError };
+type BlobChunkResult = variant { Ok : blob; Err : StorageError };
+
+service : {
+  create_blob : (BlobCreateInput) -> (BlobManifestResult);
+  upload_blob_chunk : (BlobChunkInput) -> (StorageResult);
+  finalize_blob : (text) -> (StorageResult);
+  get_blob_manifest : (text) -> (opt BlobManifest) query;
+  get_blob_chunk : (text, nat32) -> (BlobChunkResult) query;
+  delete_blob : (text) -> (StorageResult);
+}

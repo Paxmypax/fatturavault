@@ -1,0 +1,65 @@
+type AnalyticsEventType = variant {
+  UserLoggedIn;
+  SecurityOnboardingCompleted;
+  DocumentUploaded;
+  DocumentArchived;
+  NoteCreated;
+};
+
+type AnalyticsEventMetadata = record {
+  category_id : opt text;
+  document_kind : opt text;
+  source_screen : opt text;
+  item_count : opt nat32;
+};
+
+type AnalyticsEventInput = record {
+  event_type : AnalyticsEventType;
+  metadata : opt AnalyticsEventMetadata;
+};
+
+type AnalyticsEventRecord = record {
+  id : text;
+  user_hash : text;
+  event_type : AnalyticsEventType;
+  occurred_at_ns : nat64;
+  metadata : opt AnalyticsEventMetadata;
+};
+
+type DailyMetrics = record {
+  day_key : text;
+  unique_active_users : nat64;
+  logins : nat64;
+  security_onboarding_completed : nat64;
+  documents_uploaded : nat64;
+  documents_archived : nat64;
+  notes_created : nat64;
+};
+
+type ProductSummary = record {
+  total_registered_users : nat64;
+  dau : nat64;
+  wau : nat64;
+  mau : nat64;
+  total_documents_uploaded : nat64;
+  total_documents_archived : nat64;
+  total_notes_created : nat64;
+};
+
+type AnalyticsAccessState = record {
+  is_admin : bool;
+  has_admins : bool;
+};
+
+type AnalyticsEventResult = variant { Ok : AnalyticsEventRecord; Err : text };
+type BoolResult = variant { Ok : bool; Err : text };
+
+service : {
+  track_event : (AnalyticsEventInput) -> (AnalyticsEventResult);
+  grant_admin : (principal) -> (BoolResult);
+  revoke_admin : (principal) -> (BoolResult);
+  get_access_state : () -> (AnalyticsAccessState);
+  get_daily_metrics : (text) -> (opt DailyMetrics);
+  get_last_30_days_metrics : () -> (vec DailyMetrics);
+  get_product_summary : () -> (ProductSummary);
+}

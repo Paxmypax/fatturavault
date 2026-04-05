@@ -1,0 +1,11 @@
+target/
+.icp/cache/
+frontend/node_modules/
+frontend/.svelte-kit/
+frontend/build/
+frontend/.env.local
+frontend/vite-dev.log
+frontend/vite-dev.err.log
+.DS_Store
+Thumbs.db
+.tmp-empty.did

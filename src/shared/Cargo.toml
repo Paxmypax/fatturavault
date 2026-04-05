@@ -1,0 +1,8 @@
+[package]
+name = "fatturavault_shared"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+candid.workspace = true
+serde.workspace = true

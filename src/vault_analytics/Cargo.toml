@@ -1,0 +1,16 @@
+[package]
+name = "vault_analytics"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+candid.workspace = true
+ic-cdk.workspace = true
+ic-stable-structures.workspace = true
+serde.workspace = true
+sha2.workspace = true
+hex.workspace = true
+fatturavault_shared = { path = "../shared" }

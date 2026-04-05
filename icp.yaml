@@ -1,0 +1,42 @@
+networks:
+  - name: local
+    mode: managed
+    ii: true
+
+canisters:
+  - name: vault_inbox
+    recipe:
+      type: "@dfinity/rust@v3.2.0"
+      configuration:
+        package: vault_inbox
+        candid: src/vault_inbox/vault_inbox.did
+
+  - name: vault_backend
+    recipe:
+      type: "@dfinity/rust@v3.2.0"
+      configuration:
+        package: vault_backend
+        candid: src/vault_backend/vault_backend.did
+
+  - name: vault_storage
+    recipe:
+      type: "@dfinity/rust@v3.2.0"
+      configuration:
+        package: vault_storage
+        candid: src/vault_storage/vault_storage.did
+
+  - name: vault_analytics
+    recipe:
+      type: "@dfinity/rust@v3.2.0"
+      configuration:
+        package: vault_analytics
+        candid: src/vault_analytics/vault_analytics.did
+
+  - name: frontend
+    recipe:
+      type: "@dfinity/asset-canister@v2.1.0"
+      configuration:
+        dir: frontend/build
+        build:
+          - npm --prefix frontend install
+          - npm --prefix frontend run build

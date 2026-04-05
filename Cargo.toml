@@ -1,0 +1,21 @@
+[workspace]
+members = [
+  "src/shared",
+  "src/vault_inbox",
+  "src/vault_backend",
+  "src/vault_storage",
+  "src/vault_analytics",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+
+[workspace.dependencies]
+candid = "0.10"
+ic-cdk = "0.19"
+ic-stable-structures = "0.7"
+serde = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+hex = "0.4"
