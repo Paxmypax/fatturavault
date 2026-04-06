@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { goto } from '$app/navigation';
 	import {
 		authState,
@@ -9,6 +9,14 @@
 		saveSecurityState
 	} from '$lib/auth';
 	import { analyticsAccessState, initAnalyticsAccess } from '$lib/stores/analyticsAccess';
+	import NotificationBell from '$lib/components/NotificationBell.svelte';
+	import {
+		DEFAULT_OPENAI_MODEL,
+		OPENAI_MODEL_OPTIONS,
+		clearLocalLlmConfig,
+		getLocalLlmConfig,
+		saveLocalLlmConfig
+	} from '$lib/llm/config';
 	import { onMount } from 'svelte';
 
 	onMount(async () => {
@@ -27,6 +35,10 @@
 	let ackBackupDevice = $state(false);
 	let ackRiskUnderstood = $state(false);
 	let isSaving = $state(false);
+	let llmApiKey = $state('');
+	let llmModel = $state(DEFAULT_OPENAI_MODEL);
+	let llmEnabled = $state(false);
+	let llmSaved = $state(false);
 
 	$effect(() => {
 		if ($authState.displayName && !$authState.pending) {
@@ -39,6 +51,18 @@
 		ackRecoveryPhrase = $authState.security.ackRecoveryPhrase;
 		ackBackupDevice = $authState.security.ackBackupDevice;
 		ackRiskUnderstood = $authState.security.ackRiskUnderstood;
+	});
+
+	onMount(() => {
+		const llmConfig = getLocalLlmConfig();
+		if (!llmConfig) {
+			return;
+		}
+
+		llmApiKey = llmConfig.apiKey;
+		llmModel = llmConfig.model || DEFAULT_OPENAI_MODEL;
+		llmEnabled = llmConfig.enabled;
+		llmSaved = true;
 	});
 
 	async function handleDisplayNameSave() {
@@ -55,6 +79,27 @@
 			ackRiskUnderstood
 		});
 		isSaving = false;
+	}
+
+	function handleLlmSave() {
+		if (!llmApiKey.trim()) {
+			return;
+		}
+
+		saveLocalLlmConfig({
+			apiKey: llmApiKey,
+			model: llmModel,
+			enabled: llmEnabled
+		});
+		llmSaved = true;
+	}
+
+	function handleLlmReset() {
+		clearLocalLlmConfig();
+		llmApiKey = '';
+		llmModel = DEFAULT_OPENAI_MODEL;
+		llmEnabled = false;
+		llmSaved = false;
 	}
 
 	function openInternetIdentity() {
@@ -114,9 +159,9 @@
 				<a class="flex items-center gap-3 rounded-2xl bg-[#0f5d6c] px-4 py-3 text-left text-lg font-semibold text-white shadow-[0_18px_40px_rgba(15,93,108,0.18)]" href="/impostazioni">
 					Impostazioni
 				</a>
-				<button class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" type="button">
+				<a class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" href="/supporto">
 					Supporto
-				</button>
+				</a>
 				<button class="mt-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#8f4040] transition-colors hover:bg-[#fff1f1]" type="button" onclick={logout}>
 					Esci
 				</button>
@@ -126,11 +171,7 @@
 		<div class="flex min-h-screen flex-1 flex-col">
 			<header class="relative z-30 border-b border-[#dbe5ea] bg-white/62 px-5 py-4 backdrop-blur sm:px-8">
 				<div class="flex items-center justify-end gap-4">
-					<button aria-label="Notifiche" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/80 bg-white/80 text-[#29414a] shadow-[0_10px_25px_rgba(148,163,184,0.1)] transition-transform hover:-translate-y-0.5" type="button">
-						<svg aria-hidden="true" class="h-6 w-6" fill="none" viewBox="0 0 24 24">
-							<path d="M6.8 16.3H17.2L16 14.5V10a4 4 0 1 0-8 0v4.5l-1.2 1.8ZM10.1 18.6a2.1 2.1 0 0 0 3.8 0" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
-						</svg>
-					</button>
+					<NotificationBell />
 
 					<div class="relative">
 						<button class="flex items-center gap-3 rounded-full border border-white/80 bg-white/82 px-4 py-3 shadow-[0_10px_25px_rgba(148,163,184,0.1)] transition-transform hover:-translate-y-0.5" type="button" onclick={() => (showDisplayNameEditor = !showDisplayNameEditor)}>
@@ -236,8 +277,139 @@
 							</div>
 						</div>
 					</section>
+
+					<section class="mt-6 rounded-[2rem] border border-white/85 bg-white/78 p-6 shadow-[0_20px_50px_rgba(148,163,184,0.14)] backdrop-blur sm:p-8">
+						<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+							<div>
+								<p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#6a8792]">LLM outcall</p>
+								<h2 class="mt-2 text-2xl font-bold tracking-[-0.04em] text-[#103844]">Prefill documenti con API personale</h2>
+							</div>
+							<span class={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${llmSaved && llmEnabled ? 'bg-[#eef8fa] text-[#0f5d6c]' : 'bg-[#f3f6f8] text-[#566e77]'}`}>
+								{llmSaved && llmEnabled ? 'Attiva in questo browser' : 'Non configurata'}
+							</span>
+						</div>
+
+						<div class="mt-6 rounded-[1.6rem] border border-[#dce7eb] bg-white p-5 shadow-[0_16px_36px_rgba(148,163,184,0.08)]">
+							<p class="text-sm leading-6 text-[#5a707a]">
+								Questo blocco serve al prefill dei documenti in Inbox. La chiave API resta salvata solo in questo browser.
+							</p>
+
+							<div class="mt-5 grid gap-4 md:grid-cols-2">
+								<label class="grid gap-2 text-sm font-medium text-[#173843]">
+									<span>Chiave API OpenAI</span>
+									<input
+										class="min-h-12 rounded-2xl border border-[#d6e2e7] bg-white px-4 text-base font-medium text-[#173843] outline-none ring-0 placeholder:text-[#8aa0aa] focus:border-[#0f5d6c]"
+										type="password"
+										bind:value={llmApiKey}
+										placeholder="sk-..."
+									/>
+								</label>
+
+								<label class="grid gap-2 text-sm font-medium text-[#173843]">
+									<span>Modello</span>
+									<select
+										class="min-h-12 rounded-2xl border border-[#d6e2e7] bg-white px-4 text-base font-medium text-[#173843] outline-none ring-0 focus:border-[#0f5d6c]"
+										bind:value={llmModel}
+									>
+										{#each OPENAI_MODEL_OPTIONS as option}
+											<option value={option.value}>{option.label}</option>
+										{/each}
+									</select>
+								</label>
+							</div>
+
+							<label class="mt-4 flex items-start gap-3 rounded-[1.2rem] border border-[#e3edf1] bg-[#f8fbfc] p-4">
+								<input class="mt-1 h-4 w-4 accent-[#0f5d6c]" type="checkbox" bind:checked={llmEnabled} />
+								<span class="text-sm leading-6 text-[#173843]">
+									Attiva il prefill AI dei documenti in Inbox
+								</span>
+							</label>
+
+							<div class="mt-5 flex flex-wrap gap-3">
+								<button
+									class="inline-flex min-h-11 items-center justify-center rounded-2xl bg-[#0f5d6c] px-5 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,93,108,0.22)] transition-transform hover:-translate-y-0.5"
+									type="button"
+									onclick={handleLlmSave}
+								>
+									Salva configurazione LLM
+								</button>
+								<button
+									class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d7e1e8] bg-white px-5 text-sm font-semibold text-[#173843] transition-transform hover:-translate-y-0.5"
+									type="button"
+									onclick={handleLlmReset}
+								>
+									Rimuovi configurazione
+								</button>
+							</div>
+						</div>
+					</section>
+
+					<section class="mt-6 rounded-[2rem] border border-white/85 bg-white/78 p-6 shadow-[0_20px_50px_rgba(148,163,184,0.14)] backdrop-blur sm:p-8">
+						<div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+							<div>
+								<p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#6a8792]">LLM on-chain ICP</p>
+								<h2 class="mt-2 text-2xl font-bold tracking-[-0.04em] text-[#103844]">AI on-chain per chat e riepiloghi del vault</h2>
+							</div>
+							<span class="inline-flex rounded-full bg-[#eef8fa] px-4 py-2 text-sm font-semibold text-[#0f5d6c]">
+								Servizio attivo
+							</span>
+						</div>
+
+						<div class="mt-6 rounded-[1.6rem] border border-[#dce7eb] bg-white p-5 shadow-[0_16px_36px_rgba(148,163,184,0.08)]">
+							<p class="text-sm leading-6 text-[#5a707a]">
+								Questa funzione non c'entra con l'API personale usata per il prefill dei documenti in Inbox. Il prefill continua a passare dalla tua chiave privata OpenAI, mentre l'LLM on-chain gira direttamente su Internet Computer ed è dedicato alle funzioni testuali del vault.
+							</p>
+
+							<div class="mt-5 grid gap-4 md:grid-cols-2">
+								<div class="rounded-[1.2rem] border border-[#e3edf1] bg-[#f8fbfc] p-4">
+									<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[#6a8792]">Modello attuale</p>
+									<p class="mt-2 text-lg font-bold tracking-[-0.03em] text-[#173843]">Llama 3.1 8B</p>
+									<p class="mt-2 text-sm leading-6 text-[#5a707a]">
+										Il servizio on-chain usa oggi il modello <span class="font-semibold text-[#173843]">llama3.1:8b</span>.
+									</p>
+								</div>
+								<div class="rounded-[1.2rem] border border-[#e3edf1] bg-[#f8fbfc] p-4">
+									<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[#6a8792]">Costo per l'utente</p>
+									<p class="mt-2 text-lg font-bold tracking-[-0.03em] text-[#173843]">Gratuito</p>
+									<p class="mt-2 text-sm leading-6 text-[#5a707a]">
+										È un servizio AI on-chain del prodotto e al momento non richiede una chiave API personale.
+									</p>
+								</div>
+							</div>
+
+							<div class="mt-5 rounded-[1.3rem] border border-[#d8e8ed] bg-[#eef8fa] p-4 text-sm leading-6 text-[#22505d]">
+								<p class="font-semibold text-[#103844]">Differenza importante</p>
+								<p class="mt-2">
+									<span class="font-semibold text-[#173843]">LLM outcall con API personale:</span> serve per leggere file, PDF e immagini in Inbox e provare a precompilare il form documento.
+								</p>
+								<p class="mt-2">
+									<span class="font-semibold text-[#173843]">LLM on-chain ICP:</span> lavora solo su testo, numeri, date e dati già strutturati nel vault, quindi è perfetto per chat, riepiloghi e analisi leggere.
+								</p>
+							</div>
+
+							<div class="mt-4 grid gap-3 md:grid-cols-2">
+								<div class="rounded-[1.2rem] border border-[#e3edf1] bg-[#f8fbfc] p-4 text-sm leading-6 text-[#173843]">
+									<p class="font-semibold">Chat AI sul vault</p>
+									<p class="mt-1 text-[#5a707a]">Domande su spese, fatture, scadenze e riepiloghi usando solo testo e numeri già salvati.</p>
+								</div>
+								<div class="rounded-[1.2rem] border border-[#e3edf1] bg-[#f8fbfc] p-4 text-sm leading-6 text-[#173843]">
+									<p class="font-semibold">Suggerimenti intelligenti</p>
+									<p class="mt-1 text-[#5a707a]">Avvisi su documenti in scadenza, fatture da pagare e riepiloghi periodici generati dai dati del vault.</p>
+								</div>
+								<div class="rounded-[1.2rem] border border-[#e3edf1] bg-[#f8fbfc] p-4 text-sm leading-6 text-[#173843]">
+									<p class="font-semibold">Auto-tagging</p>
+									<p class="mt-1 text-[#5a707a]">Tag suggeriti dopo l'archiviazione usando titolo, categoria e storico dei tag dell'utente.</p>
+								</div>
+								<div class="rounded-[1.2rem] border border-[#e3edf1] bg-[#f8fbfc] p-4 text-sm leading-6 text-[#173843]">
+									<p class="font-semibold">Ricerca semantica</p>
+									<p class="mt-1 text-[#5a707a]">Ricerche più intelligenti sui documenti già catalogati, senza usare PDF o immagini raw.</p>
+								</div>
+							</div>
+						</div>
+					</section>
 				</div>
 			</main>
 		</div>
 	</div>
 </div>
+

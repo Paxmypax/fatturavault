@@ -183,11 +183,57 @@ type ActivityRecord = record {
   at_ns : nat64;
 };
 
+type NotificationBroadcastRecord = record {
+  id : text;
+  title : text;
+  body : text;
+  created_at_ns : nat64;
+};
+
+type NotificationViewRecord = record {
+  id : text;
+  title : text;
+  body : text;
+  created_at_ns : nat64;
+  read_at_ns : opt nat64;
+  is_unread : bool;
+};
+
+type OnchainVaultSummaryResponse = record {
+  provider : text;
+  model : text;
+  summary : text;
+  highlights : vec text;
+  generated_at_ns : nat64;
+};
+
+type OnchainVaultChatResponse = record {
+  provider : text;
+  model : text;
+  answer : text;
+  generated_at_ns : nat64;
+};
+
+type VaultCountsResponse = record {
+  processed_documents : nat64;
+  due_documents : nat64;
+  paid_documents : nat64;
+  notes_count : nat64;
+  postits_count : nat64;
+};
+
+type NotificationAccessState = record {
+  can_publish : bool;
+  has_admins : bool;
+};
+
 type UserProfileResult = variant { Ok : UserProfile; Err : text };
 type CategoryResult = variant { Ok : CategoryRecord; Err : text };
 type NoteResult = variant { Ok : NoteRecord; Err : text };
 type PostItResult = variant { Ok : PostItRecord; Err : text };
 type DocumentResult = variant { Ok : DocumentRecord; Err : text };
+type OnchainVaultSummaryResult = variant { Ok : OnchainVaultSummaryResponse; Err : text };
+type OnchainVaultChatResult = variant { Ok : OnchainVaultChatResponse; Err : text };
 type VetKeyResult = variant { Ok : blob; Err : text };
 type UnitResult = variant { Ok; Err : text };
 
@@ -213,6 +259,15 @@ service : {
 
   list_my_documents : () -> (vec DocumentRecord) query;
   list_my_activities : (opt nat32) -> (vec ActivityRecord) query;
+  get_my_vault_counts : () -> (VaultCountsResponse);
+  cleanup_my_orphan_documents : () -> (nat64);
+  list_my_notifications : () -> (vec NotificationViewRecord);
+  get_my_notification_access_state : () -> (NotificationAccessState);
+  mark_my_notifications_seen : () -> (vec NotificationViewRecord);
+  publish_broadcast_notification : (text, text) -> (variant { Ok : NotificationBroadcastRecord; Err : text });
+  add_notification_admin : (principal) -> (variant { Ok; Err : text });
+  generate_my_ai_summary : () -> (OnchainVaultSummaryResult);
+  ask_my_ai_vault : (text) -> (OnchainVaultChatResult);
   upsert_document : (DocumentUpsertInput) -> (DocumentResult);
   delete_document : (text) -> (UnitResult);
 }

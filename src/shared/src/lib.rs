@@ -204,6 +204,32 @@ pub struct ActivityRecord {
 }
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct NotificationBroadcastRecord {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub created_at_ns: u64,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct NotificationReceiptRecord {
+    pub id: String,
+    pub owner: Principal,
+    pub notification_id: String,
+    pub read_at_ns: u64,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct NotificationViewRecord {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub created_at_ns: u64,
+    pub read_at_ns: Option<u64>,
+    pub is_unread: bool,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum AnalyticsEventType {
     UserLoggedIn,
     SecurityOnboardingCompleted,
@@ -267,6 +293,15 @@ pub enum InboxDocumentStatus {
 }
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub enum InboxAnalysisStatus {
+    Idle,
+    Queued,
+    Processing,
+    Completed,
+    Error,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct InboxDocumentRecord {
     pub id: String,
     pub owner: Principal,
@@ -276,13 +311,19 @@ pub struct InboxDocumentRecord {
     pub source_blob_id: Option<String>,
     pub preview_blob_id: Option<String>,
     pub status: InboxDocumentStatus,
+    pub analysis_status: Option<InboxAnalysisStatus>,
     pub ocr_text: Option<String>,
     pub suggested_title: Option<String>,
     pub suggested_category_id: Option<String>,
     pub suggested_category_name: Option<String>,
     pub suggested_tags: Vec<String>,
     pub extracted_payload_json: Option<String>,
+    pub extracted_document_date: Option<String>,
+    pub extracted_merchant_name: Option<String>,
+    pub extracted_amount: Option<f64>,
+    pub extracted_payment_status: Option<PaymentStatus>,
     pub error_message: Option<String>,
+    pub analysis_updated_at_ns: Option<u64>,
     pub created_at_ns: u64,
     pub updated_at_ns: u64,
     pub expires_at_ns: Option<u64>,
@@ -302,17 +343,85 @@ pub struct InboxDocumentUpsertInput {
     pub created_at_ns: Option<u64>,
 }
 
-#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
 pub struct InboxAiUpdateInput {
     pub document_id: String,
     pub status: InboxDocumentStatus,
+    pub analysis_status: Option<InboxAnalysisStatus>,
     pub ocr_text: Option<String>,
     pub suggested_title: Option<String>,
     pub suggested_category_id: Option<String>,
     pub suggested_category_name: Option<String>,
     pub suggested_tags: Vec<String>,
     pub extracted_payload_json: Option<String>,
+    pub extracted_document_date: Option<String>,
+    pub extracted_merchant_name: Option<String>,
+    pub extracted_amount: Option<f64>,
+    pub extracted_payment_status: Option<PaymentStatus>,
     pub error_message: Option<String>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct InboxLlmLineItemRecord {
+    pub description: String,
+    pub amount: Option<f64>,
+    pub vat_rate: Option<f64>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct InboxLlmInvoiceDataRecord {
+    pub invoice_type: Option<String>,
+    pub invoice_number: Option<String>,
+    pub supplier: Option<String>,
+    pub vat_number: Option<String>,
+    pub net_amount: Option<f64>,
+    pub vat_rate: Option<f64>,
+    pub vat_amount: Option<f64>,
+    pub total_amount: Option<f64>,
+    pub line_items: Vec<InboxLlmLineItemRecord>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct InboxOnchainLlmRequest {
+    pub file_name: String,
+    pub mime_type: String,
+    pub extracted_text: String,
+    pub heuristic_category_name: Option<String>,
+    pub heuristic_merchant_name: Option<String>,
+    pub heuristic_document_date: Option<String>,
+    pub heuristic_amount: Option<f64>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq)]
+pub struct InboxOnchainLlmResponse {
+    pub provider: String,
+    pub model: String,
+    pub title: Option<String>,
+    pub category_name: Option<String>,
+    pub tags: Vec<String>,
+    pub document_date: Option<String>,
+    pub merchant_name: Option<String>,
+    pub amount: Option<f64>,
+    pub payment_status: Option<PaymentStatus>,
+    pub document_text_excerpt: Option<String>,
+    pub invoice_data: Option<InboxLlmInvoiceDataRecord>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct OnchainVaultSummaryResponse {
+    pub provider: String,
+    pub model: String,
+    pub summary: String,
+    pub highlights: Vec<String>,
+    pub generated_at_ns: u64,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct OnchainVaultChatResponse {
+    pub provider: String,
+    pub model: String,
+    pub answer: String,
+    pub generated_at_ns: u64,
 }
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]

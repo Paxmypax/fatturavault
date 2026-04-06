@@ -55,7 +55,7 @@
 <div class="rounded-[1.2rem] border border-[#e3edf1] bg-[#f8fbfc] p-4">
 	<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[#6a8792]">Dati fattura</p>
 
-	<div class="mt-3 flex gap-4">
+	<div class="mt-3 flex flex-wrap gap-4">
 		<label class="flex cursor-pointer items-center gap-2" for={`${fieldId}-type-receipt`}>
 			<input
 				id={`${fieldId}-type-receipt`}
@@ -123,12 +123,12 @@
 		<div>
 			<label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[#6a8792]" for={`${fieldId}-net-amount`}>Imponibile</label>
 			<div class="relative">
-				<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#6a8792]">€</span>
+				<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#6a8792]">EUR</span>
 				<input
 					id={`${fieldId}-net-amount`}
 					type="number"
 					step="0.01"
-					class="w-full rounded-2xl border border-[#d6e2e7] bg-white py-2.5 pl-7 pr-3 text-sm font-medium text-[#173843] outline-none focus:border-[#0f5d6c] [font-family:'DM_Mono',monospace]"
+					class="w-full rounded-2xl border border-[#d6e2e7] bg-white py-2.5 pl-12 pr-3 text-sm font-medium text-[#173843] outline-none focus:border-[#0f5d6c] [font-family:'DM_Mono',monospace]"
 					placeholder="0.00"
 					value={data.netAmount ?? ''}
 					oninput={(event) => {
@@ -155,12 +155,12 @@
 		<div>
 			<label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[#6a8792]" for={`${fieldId}-vat-amount`}>IVA</label>
 			<div class="relative">
-				<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#6a8792]">€</span>
+				<span class="absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-[#6a8792]">EUR</span>
 				<input
 					id={`${fieldId}-vat-amount`}
 					type="text"
 					readonly
-					class="w-full rounded-2xl border border-[#d6e2e7] bg-[#f4f8fa] py-2.5 pl-7 pr-3 text-sm font-medium text-[#173843] [font-family:'DM_Mono',monospace]"
+					class="w-full rounded-2xl border border-[#d6e2e7] bg-[#f4f8fa] py-2.5 pl-12 pr-3 text-sm font-medium text-[#173843] [font-family:'DM_Mono',monospace]"
 					value={data.vatAmount != null ? data.vatAmount.toFixed(2) : ''}
 				/>
 			</div>
@@ -170,7 +170,7 @@
 	{#if data.totalAmount != null}
 		<div class="mt-3 rounded-2xl bg-[#dff1f3] px-4 py-3 text-right">
 			<span class="text-xs font-semibold uppercase tracking-[0.14em] text-[#0f5d6c]">Totale: </span>
-			<span class="text-lg font-bold text-[#0f5d6c] [font-family:'DM_Mono',monospace]">€{data.totalAmount.toFixed(2)}</span>
+			<span class="text-lg font-bold text-[#0f5d6c] [font-family:'DM_Mono',monospace]">EUR {data.totalAmount.toFixed(2)}</span>
 		</div>
 	{/if}
 
@@ -180,27 +180,27 @@
 		{#if data.lineItems.length > 0}
 			<div class="mt-2 grid gap-2">
 				{#each data.lineItems as item, index}
-					<div class="flex items-center gap-2 rounded-xl border border-[#e3edf1] bg-white p-2">
+					<div class="grid gap-2 rounded-xl border border-[#e3edf1] bg-white p-2 sm:grid-cols-[minmax(0,1fr)_110px_88px_32px] sm:items-center">
 						<input
 							type="text"
-							class="min-w-0 flex-1 rounded-lg border border-[#d6e2e7] px-2 py-1.5 text-sm text-[#173843] outline-none focus:border-[#0f5d6c]"
+							class="min-w-0 w-full rounded-lg border border-[#d6e2e7] px-2 py-1.5 text-sm text-[#173843] outline-none focus:border-[#0f5d6c]"
 							placeholder="Descrizione"
 							value={item.description}
 							oninput={(event) => updateLineItem(index, 'description', (event.target as HTMLInputElement).value)}
 						/>
-						<div class="relative w-24">
-							<span class="absolute left-1.5 top-1/2 -translate-y-1/2 text-xs text-[#6a8792]">€</span>
+						<div class="relative w-full">
+							<span class="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-[#6a8792]">EUR</span>
 							<input
 								type="number"
 								step="0.01"
-								class="w-full rounded-lg border border-[#d6e2e7] py-1.5 pl-5 pr-1.5 text-sm text-[#173843] outline-none focus:border-[#0f5d6c] [font-family:'DM_Mono',monospace]"
+								class="w-full rounded-lg border border-[#d6e2e7] py-1.5 pl-10 pr-1.5 text-sm text-[#173843] outline-none focus:border-[#0f5d6c] [font-family:'DM_Mono',monospace]"
 								placeholder="0"
 								value={item.amount || ''}
 								oninput={(event) => updateLineItem(index, 'amount', Number((event.target as HTMLInputElement).value))}
 							/>
 						</div>
 						<select
-							class="w-16 rounded-lg border border-[#d6e2e7] px-1 py-1.5 text-xs text-[#173843] outline-none [font-family:'DM_Mono',monospace]"
+							class="w-full rounded-lg border border-[#d6e2e7] px-2 py-1.5 text-xs text-[#173843] outline-none [font-family:'DM_Mono',monospace]"
 							value={item.vatRate.toString()}
 							onchange={(event) => updateLineItem(index, 'vatRate', Number((event.target as HTMLSelectElement).value))}
 						>

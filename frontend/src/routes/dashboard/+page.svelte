@@ -7,6 +7,15 @@
 		logout,
 		saveDisplayName
 	} from '$lib/auth';
+	import {
+		askRemoteAiVault,
+		fetchRemoteVaultCounts,
+		generateRemoteAiVaultSummary,
+		type RemoteAiVaultChatAnswer,
+		type RemoteAiVaultSummary,
+		type RemoteVaultCounts
+	} from '$lib/ic/vaultBackend';
+	import NotificationBell from '$lib/components/NotificationBell.svelte';
 	import { addPostIt, initPostIts, postitState, removePostIt, togglePostIt } from '$lib/postits';
 	import { analyticsAccessState, initAnalyticsAccess } from '$lib/stores/analyticsAccess';
 	import { categoriesState, getCategoryByName, initCategories } from '$lib/stores/categories';
@@ -26,16 +35,25 @@
 			return;
 		}
 
-		initVault();
+		await initVault();
 		initCategories();
 		initPostIts();
 		void initAnalyticsAccess();
+		void refreshVaultCounts();
 	});
 
 	let displayNameInput = $state('');
 	let showDisplayNameEditor = $state(false);
 	let showPostItPanel = $state(false);
 	let postItInput = $state('');
+	let aiSummaryPending = $state(false);
+	let aiSummaryError = $state('');
+	let aiSummary = $state<RemoteAiVaultSummary | null>(null);
+	let vaultCounts = $state<RemoteVaultCounts | null>(null);
+	let aiQuestion = $state('');
+	let aiChatPending = $state(false);
+	let aiChatError = $state('');
+	let aiChatAnswer = $state<RemoteAiVaultChatAnswer | null>(null);
 
 	function principalLabel(principal: string | null) {
 		if (!principal) {
@@ -54,6 +72,18 @@
 			displayNameInput = $authState.displayName;
 		}
 	});
+
+	function normalizeAiChatError(error: unknown) {
+		if (!(error instanceof Error)) {
+			return 'Impossibile ottenere una risposta dalla chat AI.';
+		}
+
+		if (error.message.includes('20 domande AI oggi')) {
+			return 'Hai raggiunto il limite di 20 domande AI oggi. Riprova domani.';
+		}
+
+		return error.message;
+	}
 
 	async function handleDisplayNameSave() {
 		if (!displayNameInput.trim()) {
@@ -150,6 +180,51 @@
 		postItInput = '';
 	}
 
+	async function handleGenerateAiSummary() {
+		aiSummaryPending = true;
+		aiSummaryError = '';
+		try {
+			aiSummary = await generateRemoteAiVaultSummary();
+			if (!aiSummary) {
+				aiSummaryError = 'Non riesco a generare il riepilogo AI in questa sessione.';
+			}
+		} catch (error) {
+			aiSummaryError =
+				error instanceof Error ? error.message : 'Impossibile generare il riepilogo AI.';
+		} finally {
+			aiSummaryPending = false;
+		}
+	}
+
+	async function refreshVaultCounts() {
+		try {
+			await initVault();
+			vaultCounts = await fetchRemoteVaultCounts();
+		} catch {
+			vaultCounts = null;
+		}
+	}
+
+	async function handleAskAiVault() {
+		if (!aiQuestion.trim()) {
+			aiChatError = 'Scrivi una domanda per la chat AI.';
+			return;
+		}
+
+		aiChatPending = true;
+		aiChatError = '';
+		try {
+			aiChatAnswer = await askRemoteAiVault(aiQuestion.trim());
+			if (!aiChatAnswer) {
+				aiChatError = 'Non riesco a interrogare la chat AI in questa sessione.';
+			}
+		} catch (error) {
+			aiChatError = normalizeAiChatError(error);
+		} finally {
+			aiChatPending = false;
+		}
+	}
+
 	const orderedPostIts = $derived(
 		[...$postitState.notes].sort((a, b) => {
 			if (a.completed !== b.completed) {
@@ -162,11 +237,12 @@
 
 	const processedDocuments = $derived(
 		[...$vaultState.documents]
-			.filter(
-				(document) =>
-					document.status === 'processed' && document.remoteSyncState === 'confirmed'
-			)
+			.filter((document) => document.status === 'processed')
 			.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+	);
+
+	const processedDocumentsCount = $derived(
+		vaultCounts?.processedDocuments ?? processedDocuments.length
 	);
 
 	const recentActivities = $derived(
@@ -263,13 +339,13 @@
 					</svg>
 					Impostazioni
 				</a>
-				<button class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" type="button">
+				<a class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" href="/supporto">
 					<svg aria-hidden="true" class="h-6 w-6 shrink-0 text-[#3e5963]" fill="none" viewBox="0 0 24 24">
 						<path d="M12 20c4.42 0 8-3.36 8-7.5S16.42 5 12 5 4 8.36 4 12.5c0 1.97.81 3.77 2.14 5.1L5 21l3.83-1.12A8.54 8.54 0 0 0 12 20Z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.7" />
 						<path d="M9.2 10.3h5.6M9.2 13.7h3.8" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" />
 					</svg>
 					Supporto
-				</button>
+				</a>
 				<button class="mt-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#8f4040] transition-colors hover:bg-[#fff1f1]" type="button" onclick={logout}>
 					<svg aria-hidden="true" class="h-6 w-6 shrink-0 text-[#8f4040]" fill="none" viewBox="0 0 24 24">
 						<path d="M10 5H7.8A2.8 2.8 0 0 0 5 7.8v8.4A2.8 2.8 0 0 0 7.8 19H10" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" />
@@ -284,11 +360,7 @@
 		<div class="flex min-h-screen flex-1 flex-col">
 			<header class="relative z-30 border-b border-[#dbe5ea] bg-white/62 px-5 py-4 backdrop-blur sm:px-8">
 				<div class="flex items-center justify-end gap-4">
-					<button aria-label="Notifiche" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/80 bg-white/80 text-[#29414a] shadow-[0_10px_25px_rgba(148,163,184,0.1)] transition-transform hover:-translate-y-0.5" type="button">
-						<svg aria-hidden="true" class="h-6 w-6" fill="none" viewBox="0 0 24 24">
-							<path d="M6.8 16.3H17.2L16 14.5V10a4 4 0 1 0-8 0v4.5l-1.2 1.8ZM10.1 18.6a2.1 2.1 0 0 0 3.8 0" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
-						</svg>
-					</button>
+					<NotificationBell />
 
 					<div class="relative">
 						<button class="flex items-center gap-3 rounded-full border border-white/80 bg-white/82 px-4 py-3 shadow-[0_10px_25px_rgba(148,163,184,0.1)] transition-transform hover:-translate-y-0.5" type="button" onclick={() => (showDisplayNameEditor = !showDisplayNameEditor)}>
@@ -362,7 +434,7 @@
 									<div class="flex min-h-[80px] flex-col justify-center">
 										<p class="text-[1.1rem] font-medium leading-6 text-[#1f3037]">File Archiviati</p>
 										<p class="mt-2 text-[3.15rem] leading-none font-extrabold tracking-[-0.07em] text-[#103844]">
-											{processedDocuments.length}
+											{processedDocumentsCount}
 										</p>
 									</div>
 								</div>
@@ -377,6 +449,133 @@
 								</div>
 							</div>
 						</div>
+
+						<section class="mt-6 rounded-[2rem] border border-white/85 bg-[linear-gradient(135deg,rgba(12,92,107,0.08),rgba(255,255,255,0.88))] p-5 shadow-[0_20px_50px_rgba(148,163,184,0.14)] backdrop-blur sm:p-6">
+							<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+								<div class="max-w-3xl">
+									<p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#6a8792]">AI on-chain</p>
+									<h2 class="mt-2 text-2xl font-bold tracking-[-0.04em] text-[#103844]">Riepilogo del vault</h2>
+									<p class="mt-2 text-sm leading-6 text-[#5c727c]">
+										Genera un riepilogo testuale dai dati già strutturati del tuo archivio: documenti, importi, categorie e attività recenti.
+									</p>
+								</div>
+								<button
+									class="inline-flex min-h-12 items-center justify-center rounded-2xl bg-[#0f5d6c] px-5 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,93,108,0.22)] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+									type="button"
+									onclick={handleGenerateAiSummary}
+									disabled={aiSummaryPending}
+								>
+									{aiSummaryPending ? 'Genero riepilogo...' : aiSummary ? 'Rigenera riepilogo AI' : 'Genera riepilogo AI'}
+								</button>
+							</div>
+
+							{#if aiSummaryError}
+								<div class="mt-5 rounded-[1.4rem] border border-[#f1c7c7] bg-[#fff5f5] px-4 py-3 text-sm leading-6 text-[#8f4040]">
+									{aiSummaryError}
+								</div>
+							{/if}
+
+							{#if aiSummary}
+								<div class="mt-5 rounded-[1.7rem] border border-[#d9e8ec] bg-white/90 p-5">
+									<div class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#6a8792]">
+										<span>{aiSummary.provider === 'ic-onchain' ? 'LLM on-chain ICP' : aiSummary.provider}</span>
+										<span>•</span>
+										<span>{aiSummary.model}</span>
+										<span>•</span>
+										<span>{formatDocumentDate(aiSummary.generatedAt)}</span>
+									</div>
+									<p class="mt-4 text-base leading-7 text-[#173843]">{aiSummary.summary}</p>
+
+									{#if aiSummary.highlights.length}
+										<div class="mt-5 grid gap-3 sm:grid-cols-2">
+											{#each aiSummary.highlights as highlight}
+												<div class="rounded-[1.25rem] border border-[#e4edf1] bg-[#f8fbfc] px-4 py-3 text-sm font-medium leading-6 text-[#173843]">
+													{highlight}
+												</div>
+											{/each}
+										</div>
+									{/if}
+								</div>
+							{:else if aiSummaryPending}
+								<div class="mt-5 rounded-[1.7rem] border border-[#d9e8ec] bg-white/90 p-5 text-sm leading-6 text-[#5c727c]">
+									Sto leggendo i dati del vault e preparando un riepilogo operativo.
+								</div>
+							{/if}
+
+							<div class="mt-5 rounded-[1.7rem] border border-[#d9e8ec] bg-white/90 p-5">
+								<div class="flex flex-col gap-3 lg:flex-row lg:items-end">
+								<div class="min-w-0 flex-1">
+									<label class="text-xs font-semibold uppercase tracking-[0.16em] text-[#6a8792]" for="vault-ai-question">
+										Chat AI del vault
+									</label>
+									<p class="mt-2 text-xs leading-5 text-[#6a8792]">
+										Massimo 20 domande al giorno per account.
+									</p>
+									<input
+										id="vault-ai-question"
+										class="mt-2 min-h-12 w-full rounded-2xl border border-[#d6e2e7] bg-white px-4 text-sm font-medium text-[#173843] outline-none ring-0 placeholder:text-[#8aa0aa] focus:border-[#0f5d6c]"
+											type="text"
+											bind:value={aiQuestion}
+											placeholder="Es. Quanto ho speso in hosting?"
+											onkeydown={(event) => {
+												if (event.key === 'Enter') {
+													handleAskAiVault();
+												}
+											}}
+										/>
+									</div>
+									<button
+										class="inline-flex min-h-12 items-center justify-center rounded-2xl border border-[#d7e1e8] bg-white px-5 text-sm font-semibold text-[#173843] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+										type="button"
+										onclick={handleAskAiVault}
+										disabled={aiChatPending}
+									>
+										{aiChatPending ? 'Sto rispondendo...' : 'Chiedi al vault'}
+									</button>
+								</div>
+
+								<div class="mt-3 flex flex-wrap gap-2">
+									<button class="rounded-full bg-[#eef6f8] px-3 py-1.5 text-xs font-semibold text-[#0f5d6c]" type="button" onclick={() => (aiQuestion = 'Quali documenti risultano da pagare?')}>
+										Quali documenti risultano da pagare?
+									</button>
+									<button class="rounded-full bg-[#eef6f8] px-3 py-1.5 text-xs font-semibold text-[#0f5d6c]" type="button" onclick={() => (aiQuestion = 'Quanto ho speso in hosting e server?')}>
+										Quanto ho speso in hosting e server?
+									</button>
+									<button class="rounded-full bg-[#eef6f8] px-3 py-1.5 text-xs font-semibold text-[#0f5d6c]" type="button" onclick={() => (aiQuestion = 'Mi fai un riepilogo IVA delle fatture?')}>
+										Mi fai un riepilogo IVA delle fatture?
+									</button>
+									<button class="rounded-full bg-[#eef6f8] px-3 py-1.5 text-xs font-semibold text-[#0f5d6c]" type="button" onclick={() => (aiQuestion = 'Ci sono documenti con scadenza o rinnovo?')}>
+										Ci sono documenti con scadenza o rinnovo?
+									</button>
+									<button class="rounded-full bg-[#eef6f8] px-3 py-1.5 text-xs font-semibold text-[#0f5d6c]" type="button" onclick={() => (aiQuestion = 'Hai un riepilogo delle garanzie?')}>
+										Hai un riepilogo delle garanzie?
+									</button>
+								</div>
+
+								{#if aiChatError}
+									<div class="mt-4 rounded-[1.4rem] border border-[#f1c7c7] bg-[#fff5f5] px-4 py-3 text-sm leading-6 text-[#8f4040]">
+										{aiChatError}
+									</div>
+								{/if}
+
+								{#if aiChatAnswer}
+									<div class="mt-4 rounded-[1.4rem] border border-[#e4edf1] bg-[#f8fbfc] px-4 py-4">
+										<div class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#6a8792]">
+											<span>{aiChatAnswer.provider === 'ic-onchain' ? 'LLM on-chain ICP' : aiChatAnswer.provider}</span>
+											<span>•</span>
+											<span>{aiChatAnswer.model}</span>
+											<span>•</span>
+											<span>{formatDocumentDate(aiChatAnswer.generatedAt)}</span>
+										</div>
+										<p class="mt-3 text-sm leading-7 text-[#173843]">{aiChatAnswer.answer}</p>
+									</div>
+								{:else if aiChatPending}
+									<div class="mt-4 rounded-[1.4rem] border border-[#e4edf1] bg-[#f8fbfc] px-4 py-4 text-sm leading-6 text-[#5c727c]">
+										Sto consultando i dati strutturati del vault per risponderti.
+									</div>
+								{/if}
+							</div>
+						</section>
 
 						<section class="mt-6 rounded-[2rem] border border-white/85 bg-white/76 p-5 shadow-[0_20px_50px_rgba(148,163,184,0.14)] backdrop-blur sm:p-6">
 							<div>

@@ -14,6 +14,7 @@ import {
 	unwrapDocumentKeyForCurrentUser
 } from '$lib/crypto/userKeyProvider';
 import {
+	cleanupRemoteOrphanDocuments,
 	deleteRemoteDocument,
 	fetchRemoteActivities,
 	fetchRemoteDocuments,
@@ -1210,6 +1211,8 @@ async function syncRemoteVault() {
 			if (!mutationsFlushed) {
 				return;
 			}
+
+			await cleanupRemoteOrphanDocuments();
 
 			if (canUseStorage()) {
 				for (const document of getCurrentVaultDocuments()) {

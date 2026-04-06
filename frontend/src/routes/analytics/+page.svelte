@@ -8,13 +8,19 @@
 		saveDisplayName
 	} from '$lib/auth';
 	import {
-		fetchAnalyticsAccessState,
-		fetchAnalyticsLast30Days,
-		fetchAnalyticsSummary,
+		fetchRemoteNotificationAccessState,
+		publishRemoteNotification,
+		type RemoteNotificationAccessState
+	} from '$lib/ic/vaultBackend';
+	import {
+		fetchAnalyticsAccessState as fetchAnalyticsAccessStateFromAnalytics,
+		fetchAnalyticsLast30Days as fetchAnalyticsLast30DaysFromAnalytics,
+		fetchAnalyticsSummary as fetchAnalyticsSummaryFromAnalytics,
 		isVaultAnalyticsConfigured,
 		type DailyMetrics,
 		type ProductSummary
 	} from '$lib/ic/vaultAnalytics';
+	import NotificationBell from '$lib/components/NotificationBell.svelte';
 	import { onMount } from 'svelte';
 
 	let displayNameInput = $state('');
@@ -24,6 +30,12 @@
 	let summary = $state<ProductSummary | null>(null);
 	let last30Days = $state<DailyMetrics[]>([]);
 	let accessState = $state<{ isAdmin: boolean; hasAdmins: boolean } | null>(null);
+	let notificationAccess = $state<RemoteNotificationAccessState | null>(null);
+	let notificationTitle = $state('');
+	let notificationBody = $state('');
+	let notificationPending = $state(false);
+	let notificationFeedback = $state('');
+	let notificationError = $state('');
 
 	onMount(async () => {
 		await initAuth();
@@ -82,10 +94,11 @@
 
 		try {
 			accessState =
-				(await fetchAnalyticsAccessState()) ?? {
+				(await fetchAnalyticsAccessStateFromAnalytics()) ?? {
 					isAdmin: false,
 					hasAdmins: false
 				};
+			notificationAccess = await fetchRemoteNotificationAccessState();
 			if (!accessState.isAdmin) {
 				summary = null;
 				last30Days = [];
@@ -93,8 +106,8 @@
 			}
 
 			const [summaryResult, metricsResult] = await Promise.all([
-				fetchAnalyticsSummary(),
-				fetchAnalyticsLast30Days()
+				fetchAnalyticsSummaryFromAnalytics(),
+				fetchAnalyticsLast30DaysFromAnalytics()
 			]);
 
 			summary = summaryResult;
@@ -104,6 +117,34 @@
 			errorMessage = 'Non sono riuscito a leggere i dati analytics dal canister locale.';
 		} finally {
 			loading = false;
+		}
+	}
+
+	async function handlePublishNotification() {
+		if (!notificationAccess?.canPublish || notificationPending) {
+			return;
+		}
+
+		if (!notificationTitle.trim() || !notificationBody.trim()) {
+			notificationError = 'Inserisci titolo e messaggio prima di inviare.';
+			notificationFeedback = '';
+			return;
+		}
+
+		notificationPending = true;
+		notificationError = '';
+		notificationFeedback = '';
+
+		try {
+			await publishRemoteNotification(notificationTitle.trim(), notificationBody.trim());
+			notificationFeedback = 'Notifica inviata agli iscritti.';
+			notificationTitle = '';
+			notificationBody = '';
+		} catch (error) {
+			notificationError =
+				error instanceof Error ? error.message : 'Impossibile inviare la notifica.';
+		} finally {
+			notificationPending = false;
 		}
 	}
 
@@ -218,13 +259,13 @@
 					</svg>
 					Impostazioni
 				</a>
-				<button class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" type="button">
+				<a class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" href="/supporto">
 					<svg aria-hidden="true" class="h-6 w-6 shrink-0 text-[#3e5963]" fill="none" viewBox="0 0 24 24">
 						<path d="M12 20c4.42 0 8-3.36 8-7.5S16.42 5 12 5 4 8.36 4 12.5c0 1.97.81 3.77 2.14 5.1L5 21l3.83-1.12A8.54 8.54 0 0 0 12 20Z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.7" />
 						<path d="M9.2 10.3h5.6M9.2 13.7h3.8" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" />
 					</svg>
 					Supporto
-				</button>
+				</a>
 				<button class="mt-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#8f4040] transition-colors hover:bg-[#fff1f1]" type="button" onclick={logout}>
 					<svg aria-hidden="true" class="h-6 w-6 shrink-0 text-[#8f4040]" fill="none" viewBox="0 0 24 24">
 						<path d="M10 5H7.8A2.8 2.8 0 0 0 5 7.8v8.4A2.8 2.8 0 0 0 7.8 19H10" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" />
@@ -239,11 +280,7 @@
 		<div class="flex min-h-screen flex-1 flex-col">
 			<header class="relative z-30 border-b border-[#dbe5ea] bg-white/62 px-5 py-4 backdrop-blur sm:px-8">
 				<div class="flex items-center justify-end gap-4">
-					<button aria-label="Notifiche" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/80 bg-white/80 text-[#29414a] shadow-[0_10px_25px_rgba(148,163,184,0.1)] transition-transform hover:-translate-y-0.5" type="button">
-						<svg aria-hidden="true" class="h-6 w-6" fill="none" viewBox="0 0 24 24">
-							<path d="M6.8 16.3H17.2L16 14.5V10a4 4 0 1 0-8 0v4.5l-1.2 1.8ZM10.1 18.6a2.1 2.1 0 0 0 3.8 0" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
-						</svg>
-					</button>
+					<NotificationBell />
 
 					<div class="relative">
 						<button class="flex items-center gap-3 rounded-full border border-white/80 bg-white/82 px-4 py-3 shadow-[0_10px_25px_rgba(148,163,184,0.1)] transition-transform hover:-translate-y-0.5" type="button" onclick={() => (showDisplayNameEditor = !showDisplayNameEditor)}>
@@ -367,6 +404,73 @@
 								<p class="mt-3 text-sm text-[#5a707a]">I tre segnali minimi per capire se il prodotto viene davvero usato.</p>
 							</div>
 						</div>
+
+						{#if notificationAccess?.canPublish}
+							<section class="mt-6 rounded-[1.8rem] border border-white/90 bg-white/84 p-5 shadow-[0_18px_42px_rgba(148,163,184,0.14)]">
+								<div class="flex items-center justify-between gap-3">
+									<div>
+										<p class="text-xs font-semibold uppercase tracking-[0.18em] text-[#6a8792]">Broadcast</p>
+										<h2 class="mt-2 text-2xl font-bold tracking-[-0.04em] text-[#103844]">Invia notifica agli iscritti</h2>
+									</div>
+									<span class="rounded-full bg-[#eef7f9] px-3 py-1 text-xs font-semibold text-[#0f5d6c]">
+										Campanella utente
+									</span>
+								</div>
+
+								<p class="mt-3 max-w-3xl text-sm leading-6 text-[#5a707a]">
+									Il messaggio appare nella campanella di tutti gli iscritti. Il pallino rosso sparisce quando l’utente apre il pannello, e la notifica letta si nasconde da sola dopo 24 ore.
+								</p>
+
+								<div class="mt-5 grid gap-4">
+									<label class="grid gap-2">
+										<span class="text-xs font-semibold uppercase tracking-[0.16em] text-[#6a8792]">Titolo</span>
+										<input
+											class="rounded-[1rem] border border-[#dbe5ea] bg-white px-4 py-3 text-sm text-[#173843] outline-none transition focus:border-[#0f5d6c] focus:ring-2 focus:ring-[#d8eef2]"
+											type="text"
+											maxlength="120"
+											bind:value={notificationTitle}
+											placeholder="Es. Nuova funzione disponibile"
+										/>
+									</label>
+
+									<label class="grid gap-2">
+										<span class="text-xs font-semibold uppercase tracking-[0.16em] text-[#6a8792]">Messaggio</span>
+										<textarea
+											class="min-h-[120px] rounded-[1rem] border border-[#dbe5ea] bg-white px-4 py-3 text-sm leading-6 text-[#173843] outline-none transition focus:border-[#0f5d6c] focus:ring-2 focus:ring-[#d8eef2]"
+											bind:value={notificationBody}
+											maxlength="1200"
+											placeholder="Scrivi il messaggio che vuoi inviare agli iscritti."
+										></textarea>
+									</label>
+
+									<div class="flex items-center justify-between gap-4">
+										<p class="text-xs leading-5 text-[#6a8792]">
+											Le notifiche sono broadcast e non richiedono azioni manuali dell’utente per sparire dopo la lettura.
+										</p>
+										<button
+											class="rounded-full bg-[#0f5d6c] px-5 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(15,93,108,0.18)] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70"
+											type="button"
+											onclick={handlePublishNotification}
+											disabled={notificationPending}
+										>
+											{notificationPending ? 'Invio in corso...' : 'Invia notifica'}
+										</button>
+									</div>
+
+									{#if notificationFeedback}
+										<p class="rounded-[1rem] border border-[#d9ece2] bg-[#f3fbf6] px-4 py-3 text-sm text-[#1f7a45]">
+											{notificationFeedback}
+										</p>
+									{/if}
+
+									{#if notificationError}
+										<p class="rounded-[1rem] border border-[#f0d1d1] bg-[#fff6f6] px-4 py-3 text-sm text-[#8f4040]">
+											{notificationError}
+										</p>
+									{/if}
+								</div>
+							</section>
+						{/if}
 
 						<div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
 							<section class="rounded-[1.8rem] border border-white/90 bg-white/84 p-5 shadow-[0_18px_42px_rgba(148,163,184,0.14)]">

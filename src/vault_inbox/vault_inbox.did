@@ -6,6 +6,61 @@ type InboxDocumentStatus = variant {
   Error;
 };
 
+type InboxAnalysisStatus = variant {
+  Idle;
+  Queued;
+  Processing;
+  Completed;
+  Error;
+};
+
+type PaymentStatus = variant {
+  Due;
+  Paid;
+};
+
+type InboxLlmLineItemRecord = record {
+  description : text;
+  amount : opt float64;
+  vat_rate : opt float64;
+};
+
+type InboxLlmInvoiceDataRecord = record {
+  invoice_type : opt text;
+  invoice_number : opt text;
+  supplier : opt text;
+  vat_number : opt text;
+  net_amount : opt float64;
+  vat_rate : opt float64;
+  vat_amount : opt float64;
+  total_amount : opt float64;
+  line_items : vec InboxLlmLineItemRecord;
+};
+
+type InboxOnchainLlmRequest = record {
+  file_name : text;
+  mime_type : text;
+  extracted_text : text;
+  heuristic_category_name : opt text;
+  heuristic_merchant_name : opt text;
+  heuristic_document_date : opt text;
+  heuristic_amount : opt float64;
+};
+
+type InboxOnchainLlmResponse = record {
+  provider : text;
+  model : text;
+  title : opt text;
+  category_name : opt text;
+  tags : vec text;
+  document_date : opt text;
+  merchant_name : opt text;
+  amount : opt float64;
+  payment_status : opt PaymentStatus;
+  document_text_excerpt : opt text;
+  invoice_data : opt InboxLlmInvoiceDataRecord;
+};
+
 type InboxDocumentRecord = record {
   id : text;
   owner : principal;
@@ -15,13 +70,19 @@ type InboxDocumentRecord = record {
   source_blob_id : opt text;
   preview_blob_id : opt text;
   status : InboxDocumentStatus;
+  analysis_status : opt InboxAnalysisStatus;
   ocr_text : opt text;
   suggested_title : opt text;
   suggested_category_id : opt text;
   suggested_category_name : opt text;
   suggested_tags : vec text;
   extracted_payload_json : opt text;
+  extracted_document_date : opt text;
+  extracted_merchant_name : opt text;
+  extracted_amount : opt float64;
+  extracted_payment_status : opt PaymentStatus;
   error_message : opt text;
+  analysis_updated_at_ns : opt nat64;
   created_at_ns : nat64;
   updated_at_ns : nat64;
   expires_at_ns : opt nat64;
@@ -43,16 +104,22 @@ type InboxDocumentUpsertInput = record {
 type InboxAiUpdateInput = record {
   document_id : text;
   status : InboxDocumentStatus;
+  analysis_status : opt InboxAnalysisStatus;
   ocr_text : opt text;
   suggested_title : opt text;
   suggested_category_id : opt text;
   suggested_category_name : opt text;
   suggested_tags : vec text;
   extracted_payload_json : opt text;
+  extracted_document_date : opt text;
+  extracted_merchant_name : opt text;
+  extracted_amount : opt float64;
+  extracted_payment_status : opt PaymentStatus;
   error_message : opt text;
 };
 
 type InboxDocumentResult = variant { Ok : InboxDocumentRecord; Err : text };
+type InboxOnchainLlmResult = variant { Ok : InboxOnchainLlmResponse; Err : text };
 type UnitResult = variant { Ok : null; Err : text };
 
 service : {
@@ -60,6 +127,7 @@ service : {
   get_my_inbox_document : (text) -> (opt InboxDocumentRecord);
   upsert_inbox_document : (InboxDocumentUpsertInput) -> (InboxDocumentResult);
   update_inbox_ai_state : (InboxAiUpdateInput) -> (InboxDocumentResult);
+  analyze_inbox_with_onchain_llm : (InboxOnchainLlmRequest) -> (InboxOnchainLlmResult);
   mark_inbox_document_archived : (text, opt nat64) -> (InboxDocumentResult);
   delete_inbox_document : (text) -> (UnitResult);
   purge_my_expired_inbox_documents : (opt nat32) -> (nat32);

@@ -29,6 +29,8 @@
 	"dependencies": {
 		"@dfinity/vetkeys": "^0.4.0",
 		"@icp-sdk/auth": "^5.0.0",
-		"@icp-sdk/core": "^5.2.0"
+		"@icp-sdk/core": "^5.2.0",
+		"pdfjs-dist": "^5.4.149",
+		"tesseract.js": "^7.0.0"
 	}
 }

@@ -1,4 +1,4 @@
-<svelte:head>
+﻿<svelte:head>
   <title>FatturaVault</title>
   <meta
     content="Il tuo cassetto digitale sicuro per fatture e documenti importanti."
@@ -146,13 +146,13 @@
           <p>
             Fattura Vault è un archivio digitale pensato per raccogliere e organizzare documenti
             importanti in un unico spazio personale. È costruito su blockchain, cioè su
-            un’infrastruttura distribuita che non dipende da un singolo server o da un solo
+            un'infrastruttura distribuita che non dipende da un singolo server o da un solo
             operatore.
           </p>
           <p>
             La tecnologia su cui si basa è ICP, Internet Computer, una blockchain progettata per
             ospitare applicazioni e dati accessibili via web. Questo significa che Fattura Vault
-            non è solo un sito tradizionale appoggiato a un’infrastruttura privata, ma un’app
+            non è solo un sito tradizionale appoggiato a un'infrastruttura privata, ma un'app
             costruita su una rete aperta.
           </p>
           <p>
@@ -173,14 +173,19 @@
         </h3>
         <div class="mt-5 grid gap-4 text-sm leading-7 text-[#5a707a] sm:text-[1.02rem]">
           <p>
-            L’app è organizzata in sezioni semplici: Inbox per caricare tutto al volo, Vault per
+            L'app è organizzata in sezioni semplici: Inbox per caricare tutto al volo, Vault per
             consultare i documenti archiviati, Categorie per tenerli ordinati, Note per
-            annotazioni più strutturate e Dashboard per avere una vista rapida d’insieme.
+            annotazioni più strutturate e Dashboard per avere una vista rapida d'insieme.
           </p>
           <p>
-            L’idea è pratica: prima metti dentro i file, poi li sistemi con calma. Tag, categorie,
-            date, importi e dettagli ti aiutano a ritrovare tutto senza trasformare l’archivio in
+            L'idea è pratica: prima metti dentro i file, poi li sistemi con calma. Tag, categorie,
+            date, importi e dettagli ti aiutano a ritrovare tutto senza trasformare l'archivio in
             un caos.
+          </p>
+          <p>
+            L'intelligenza artificiale in Fattura Vault ti aiuta a lavorare più velocemente con i documenti.
+            Può precompilare parte dei campi quando carichi un file in Inbox e, una volta archiviato,
+            aiutarti a leggere meglio il tuo vault con riepiloghi e domande sui dati già salvati.
           </p>
         </div>
       </article>
@@ -195,24 +200,44 @@
         </h3>
         <div class="mt-5 grid gap-4 text-sm leading-7 text-[#5a707a] sm:text-[1.02rem]">
           <p>
-            Con Fattura Vault l’accesso passa da Internet Identity, un sistema pensato per ridurre
-            la dipendenza da password tradizionali e migliorare la protezione dell’account. La
+            Con Fattura Vault l'accesso passa da Internet Identity, un sistema pensato per ridurre
+            la dipendenza da password tradizionali e migliorare la protezione dell'account. La
             sicurezza non si basa solo su un login, ma su un modello costruito per dare più
-            controllo all’utente.
+            controllo all'utente.
           </p>
           <p>
-            A differenza di un prodotto chiuso gestito interamente da una singola azienda, un’app
-            su blockchain vive su un’infrastruttura aperta e distribuita. Questo riduce la
+            A differenza di un prodotto chiuso gestito interamente da una singola azienda, un'app
+            su blockchain vive su un'infrastruttura aperta e distribuita. Questo riduce la
             dipendenza da un singolo datacenter o da un unico gestore centrale e rende il servizio
             meno legato alle logiche di una piattaforma proprietaria.
           </p>
           <p>
-            In pratica significa più continuità, più trasparenza sull’infrastruttura e un archivio
-            costruito per restare nel tempo, senza essere chiuso dentro l’ecosistema di un grande
+            In pratica significa più continuità, più trasparenza sull'infrastruttura e un archivio
+            costruito per restare nel tempo, senza essere chiuso dentro l'ecosistema di un grande
             fornitore.
           </p>
+        </div>
+      </article>
+
+      <article
+        class="rounded-[2rem] border border-white/85 bg-white/78 p-6 shadow-[0_20px_50px_rgba(148,163,184,0.14)] backdrop-blur sm:p-8"
+      >
+        <p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#6a8792]">Documenti legali</p>
+        <h3 class="mt-3 text-2xl font-bold tracking-[-0.04em] text-[#103844] sm:text-[2.2rem]">
+          Informazioni essenziali prima di usare il servizio
+        </h3>
+        <div class="mt-5 grid gap-4 text-sm leading-7 text-[#5a707a] sm:text-[1.02rem]">
+          <p>
+            Se stai valutando Fattura Vault, qui trovi una base chiara su privacy, termini di servizio e uso delle funzioni AI. Prima di un'apertura pubblica ampia questi documenti andranno completati con i dati legali definitivi del gestore.
+          </p>
+        </div>
+        <div class="mt-6 flex flex-wrap gap-3">
+          <a class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d7e1e8] bg-white px-5 text-sm font-semibold text-[#12303b] shadow-[0_10px_25px_rgba(148,163,184,0.1)] hover:-translate-y-0.5 transition-transform" href="/privacy">Privacy Policy</a>
+          <a class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d7e1e8] bg-white px-5 text-sm font-semibold text-[#12303b] shadow-[0_10px_25px_rgba(148,163,184,0.1)] hover:-translate-y-0.5 transition-transform" href="/termini">Termini di Servizio</a>
+          <a class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d7e1e8] bg-white px-5 text-sm font-semibold text-[#12303b] shadow-[0_10px_25px_rgba(148,163,184,0.1)] hover:-translate-y-0.5 transition-transform" href="/informativa-ai">Informativa AI e Cookie</a>
         </div>
       </article>
     </section>
   </main>
 </div>
+

@@ -66,6 +66,13 @@ export type InboxDocumentStatus =
 	| 'archived'
 	| 'error';
 
+export type InboxAnalysisStatus =
+	| 'idle'
+	| 'queued'
+	| 'processing'
+	| 'completed'
+	| 'error';
+
 export type InboxDocument = {
 	id: string;
 	name: string;
@@ -74,13 +81,19 @@ export type InboxDocument = {
 	sourceBlobId?: string;
 	previewBlobId?: string;
 	status: InboxDocumentStatus;
+	analysisStatus?: InboxAnalysisStatus;
 	ocrText?: string;
 	suggestedTitle?: string;
 	suggestedCategoryId?: string;
 	suggestedCategoryName?: string;
 	suggestedTags: string[];
 	extractedPayloadJson?: string;
+	extractedDocumentDate?: string;
+	extractedMerchantName?: string;
+	extractedAmount?: number;
+	extractedPaymentStatus?: 'due' | 'paid';
 	errorMessage?: string;
+	analysisUpdatedAt?: string;
 	createdAt: string;
 	updatedAt: string;
 	expiresAt?: string;

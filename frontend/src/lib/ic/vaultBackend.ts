@@ -186,6 +186,50 @@ type RawActivityRecord = {
 	at_ns: bigint;
 };
 
+type RawOnchainVaultSummaryResponse = {
+	provider: string;
+	model: string;
+	summary: string;
+	highlights: string[];
+	generated_at_ns: bigint;
+};
+
+type RawOnchainVaultChatResponse = {
+	provider: string;
+	model: string;
+	answer: string;
+	generated_at_ns: bigint;
+};
+
+type RawVaultCountsResponse = {
+	processed_documents: bigint;
+	due_documents: bigint;
+	paid_documents: bigint;
+	notes_count: bigint;
+	postits_count: bigint;
+};
+
+type RawNotificationBroadcastRecord = {
+	id: string;
+	title: string;
+	body: string;
+	created_at_ns: bigint;
+};
+
+type RawNotificationViewRecord = {
+	id: string;
+	title: string;
+	body: string;
+	created_at_ns: bigint;
+	read_at_ns: Nullable<bigint>;
+	is_unread: boolean;
+};
+
+type RawNotificationAccessState = {
+	can_publish: boolean;
+	has_admins: boolean;
+};
+
 export type RemoteVaultDocument = {
 	id: string;
 	name: string;
@@ -230,6 +274,43 @@ export type RemoteVetKeyConfig = {
 	aesDomainSeparator: string;
 };
 
+export type RemoteAiVaultSummary = {
+	provider: string;
+	model: string;
+	summary: string;
+	highlights: string[];
+	generatedAt: string;
+};
+
+export type RemoteAiVaultChatAnswer = {
+	provider: string;
+	model: string;
+	answer: string;
+	generatedAt: string;
+};
+
+export type RemoteVaultCounts = {
+	processedDocuments: number;
+	dueDocuments: number;
+	paidDocuments: number;
+	notesCount: number;
+	postitsCount: number;
+};
+
+export type RemoteNotification = {
+	id: string;
+	title: string;
+	body: string;
+	createdAt: string;
+	readAt?: string;
+	isUnread: boolean;
+};
+
+export type RemoteNotificationAccessState = {
+	canPublish: boolean;
+	hasAdmins: boolean;
+};
+
 type VaultBackendActor = {
 	get_my_profile: () => Promise<Nullable<RawUserProfile>>;
 	get_user_vetkey_config: () => Promise<RawVetKeyConfigRecord>;
@@ -272,6 +353,17 @@ type VaultBackendActor = {
 	delete_postit: (postitId: string) => Promise<{ Ok: null } | { Err: string }>;
 	list_my_documents: () => Promise<RawDocumentRecord[]>;
 	list_my_activities: (limit: Nullable<number>) => Promise<RawActivityRecord[]>;
+	get_my_vault_counts: () => Promise<RawVaultCountsResponse>;
+	cleanup_my_orphan_documents: () => Promise<bigint>;
+	list_my_notifications: () => Promise<RawNotificationViewRecord[]>;
+	get_my_notification_access_state: () => Promise<RawNotificationAccessState>;
+	mark_my_notifications_seen: () => Promise<RawNotificationViewRecord[]>;
+	publish_broadcast_notification: (
+		title: string,
+		body: string
+	) => Promise<BackendResult<RawNotificationBroadcastRecord>>;
+	generate_my_ai_summary: () => Promise<BackendResult<RawOnchainVaultSummaryResponse>>;
+	ask_my_ai_vault: (question: string) => Promise<BackendResult<RawOnchainVaultChatResponse>>;
 	upsert_document: (input: RawDocumentUpsertInput) => Promise<BackendResult<RawDocumentRecord>>;
 	delete_document: (documentId: string) => Promise<{ Ok: null } | { Err: string }>;
 };
@@ -462,11 +554,52 @@ function idlFactory({ IDL: idl }: { IDL: any }) {
 		at_ns: idl.Nat64
 	});
 
+	const OnchainVaultSummaryResponse = idl.Record({
+		provider: idl.Text,
+		model: idl.Text,
+		summary: idl.Text,
+		highlights: idl.Vec(idl.Text),
+		generated_at_ns: idl.Nat64
+	});
+	const OnchainVaultChatResponse = idl.Record({
+		provider: idl.Text,
+		model: idl.Text,
+		answer: idl.Text,
+		generated_at_ns: idl.Nat64
+	});
+	const VaultCountsResponse = idl.Record({
+		processed_documents: idl.Nat64,
+		due_documents: idl.Nat64,
+		paid_documents: idl.Nat64,
+		notes_count: idl.Nat64,
+		postits_count: idl.Nat64
+	});
+	const NotificationBroadcastRecord = idl.Record({
+		id: idl.Text,
+		title: idl.Text,
+		body: idl.Text,
+		created_at_ns: idl.Nat64
+	});
+	const NotificationViewRecord = idl.Record({
+		id: idl.Text,
+		title: idl.Text,
+		body: idl.Text,
+		created_at_ns: idl.Nat64,
+		read_at_ns: idl.Opt(idl.Nat64),
+		is_unread: idl.Bool
+	});
+	const NotificationAccessState = idl.Record({
+		can_publish: idl.Bool,
+		has_admins: idl.Bool
+	});
+
 	const UserProfileResult = idl.Variant({ Ok: UserProfile, Err: idl.Text });
 	const CategoryResult = idl.Variant({ Ok: CategoryRecord, Err: idl.Text });
 	const NoteResult = idl.Variant({ Ok: NoteRecord, Err: idl.Text });
 	const PostItResult = idl.Variant({ Ok: PostItRecord, Err: idl.Text });
 	const DocumentResult = idl.Variant({ Ok: DocumentRecord, Err: idl.Text });
+	const OnchainVaultSummaryResult = idl.Variant({ Ok: OnchainVaultSummaryResponse, Err: idl.Text });
+	const OnchainVaultChatResult = idl.Variant({ Ok: OnchainVaultChatResponse, Err: idl.Text });
 	const UnitResult = idl.Variant({ Ok: idl.Null, Err: idl.Text });
 
 	return idl.Service({
@@ -505,6 +638,18 @@ function idlFactory({ IDL: idl }: { IDL: any }) {
 		delete_postit: idl.Func([idl.Text], [UnitResult], []),
 		list_my_documents: idl.Func([], [idl.Vec(DocumentRecord)], []),
 		list_my_activities: idl.Func([idl.Opt(idl.Nat32)], [idl.Vec(ActivityRecord)], []),
+		get_my_vault_counts: idl.Func([], [VaultCountsResponse], []),
+		cleanup_my_orphan_documents: idl.Func([], [idl.Nat64], []),
+		list_my_notifications: idl.Func([], [idl.Vec(NotificationViewRecord)], []),
+		get_my_notification_access_state: idl.Func([], [NotificationAccessState], []),
+		mark_my_notifications_seen: idl.Func([], [idl.Vec(NotificationViewRecord)], []),
+		publish_broadcast_notification: idl.Func(
+			[idl.Text, idl.Text],
+			[idl.Variant({ Ok: NotificationBroadcastRecord, Err: idl.Text })],
+			[]
+		),
+		generate_my_ai_summary: idl.Func([], [OnchainVaultSummaryResult], []),
+		ask_my_ai_vault: idl.Func([idl.Text], [OnchainVaultChatResult], []),
 		upsert_document: idl.Func([DocumentUpsertInput], [DocumentResult], []),
 		delete_document: idl.Func([idl.Text], [UnitResult], [])
 	});
@@ -1175,6 +1320,125 @@ export async function fetchRemoteActivities(limit?: number) {
 		categoryName: optionToUndefined(activity.category_name),
 		at: bigintToIso(activity.at_ns) ?? new Date().toISOString()
 	}));
+}
+
+export async function fetchRemoteVaultCounts(): Promise<RemoteVaultCounts | null> {
+	const actor = await getActor();
+	if (!actor) {
+		return null;
+	}
+
+	const counts = await actor.get_my_vault_counts();
+	return {
+		processedDocuments: Number(counts.processed_documents),
+		dueDocuments: Number(counts.due_documents),
+		paidDocuments: Number(counts.paid_documents),
+		notesCount: Number(counts.notes_count),
+		postitsCount: Number(counts.postits_count)
+	};
+}
+
+export async function cleanupRemoteOrphanDocuments(): Promise<number | null> {
+	const actor = await getActor();
+	if (!actor) {
+		return null;
+	}
+
+	const removed = await actor.cleanup_my_orphan_documents();
+	return Number(removed);
+}
+
+function mapRemoteNotification(raw: RawNotificationViewRecord): RemoteNotification {
+	return {
+		id: raw.id,
+		title: raw.title,
+		body: raw.body,
+		createdAt: bigintToIso(raw.created_at_ns) ?? new Date().toISOString(),
+		readAt: bigintToIso(optionToUndefined(raw.read_at_ns)) ?? undefined,
+		isUnread: raw.is_unread
+	};
+}
+
+export async function fetchRemoteNotifications(): Promise<RemoteNotification[] | null> {
+	const actor = await getActor();
+	if (!actor) {
+		return null;
+	}
+
+	const notifications = await actor.list_my_notifications();
+	return notifications.map(mapRemoteNotification);
+}
+
+export async function fetchRemoteNotificationAccessState(): Promise<RemoteNotificationAccessState | null> {
+	const actor = await getActor();
+	if (!actor) {
+		return null;
+	}
+
+	const access = await actor.get_my_notification_access_state();
+	return {
+		canPublish: access.can_publish,
+		hasAdmins: access.has_admins
+	};
+}
+
+export async function markRemoteNotificationsSeen(): Promise<RemoteNotification[] | null> {
+	const actor = await getActor();
+	if (!actor) {
+		return null;
+	}
+
+	const notifications = await actor.mark_my_notifications_seen();
+	return notifications.map(mapRemoteNotification);
+}
+
+export async function publishRemoteNotification(title: string, body: string) {
+	const actor = await getActor();
+	if (!actor) {
+		return null;
+	}
+
+	const result = await actor.publish_broadcast_notification(title, body);
+	const notification = unwrapResult(result);
+	return {
+		id: notification.id,
+		title: notification.title,
+		body: notification.body,
+		createdAt: bigintToIso(notification.created_at_ns) ?? new Date().toISOString()
+	};
+}
+
+export async function generateRemoteAiVaultSummary(): Promise<RemoteAiVaultSummary | null> {
+	const actor = await getActor();
+	if (!actor) {
+		return null;
+	}
+
+	const result = await actor.generate_my_ai_summary();
+	const summary = unwrapResult(result);
+	return {
+		provider: summary.provider,
+		model: summary.model,
+		summary: summary.summary,
+		highlights: summary.highlights,
+		generatedAt: bigintToIso(summary.generated_at_ns) ?? new Date().toISOString()
+	};
+}
+
+export async function askRemoteAiVault(question: string): Promise<RemoteAiVaultChatAnswer | null> {
+	const actor = await getActor();
+	if (!actor) {
+		return null;
+	}
+
+	const result = await actor.ask_my_ai_vault(question);
+	const answer = unwrapResult(result);
+	return {
+		provider: answer.provider,
+		model: answer.model,
+		answer: answer.answer,
+		generatedAt: bigintToIso(answer.generated_at_ns) ?? new Date().toISOString()
+	};
 }
 
 export async function upsertRemoteDocument(document: RemoteVaultDocument) {

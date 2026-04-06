@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { browser } from '$app/environment';
 	import { goto } from '$app/navigation';
 	import CategoryIcon from '$lib/components/CategoryIcon.svelte';
@@ -30,6 +30,58 @@
 
 	function isInboxDocument(value: VaultDocument | InboxDocument): value is InboxDocument {
 		return 'sourceScope' in value && value.sourceScope === 'inbox';
+	}
+
+	function hasAiPrefill(value: VaultDocument | InboxDocument) {
+		if (!isInboxDocument(value) || !value.extractedPayloadJson) {
+			return false;
+		}
+
+		try {
+			const parsed = JSON.parse(value.extractedPayloadJson) as { provider?: string };
+			return parsed?.provider === 'openai';
+		} catch {
+			return false;
+		}
+	}
+
+	function getAnalysisDetails(value: VaultDocument | InboxDocument) {
+		if (!isInboxDocument(value) || !value.extractedPayloadJson) {
+			return null;
+		}
+
+		try {
+			const parsed = JSON.parse(value.extractedPayloadJson) as {
+				provider?: string;
+				model?: string;
+				inputKind?: string;
+			};
+
+			if (!parsed?.provider) {
+				return null;
+			}
+
+			const sourceLabel =
+				parsed.inputKind === 'image'
+					? 'immagine'
+					: parsed.inputKind === 'image+text'
+						? 'immagine con testo'
+						: parsed.inputKind === 'pdf'
+							? 'PDF'
+							: parsed.inputKind === 'pdf+text'
+								? 'PDF con testo'
+								: parsed.inputKind === 'text'
+									? 'testo documento'
+									: 'file';
+
+			return {
+				provider: parsed.provider,
+				model: parsed.model,
+				sourceLabel
+			};
+		} catch {
+			return null;
+		}
 	}
 
 	const formId = `document-form-${Math.random().toString(36).slice(2, 8)}`;
@@ -95,6 +147,7 @@
 	let hasInvoiceDetails = $derived(!!document.invoiceData);
 	let hasWarrantyDetails = $derived(!!document.warrantyData);
 	let showExpirySuggestion = $derived(expirySuggestedCategories.includes(categoryName) && !hasExpiry);
+	let analysisDetails = $derived(getAnalysisDetails(document));
 	let selectedCategory = $derived(
 		categories.find((category) => category.name === categoryName) ??
 			categories.find((category) => category.name === 'Altro') ??
@@ -127,6 +180,11 @@
 			event.preventDefault();
 			addTag();
 		}
+	}
+
+	function handleTagSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		addTag();
 	}
 
 	function parseAmount(value: string | number | null | undefined) {
@@ -270,6 +328,26 @@
 
 		{#if isEditing}
 			<div class="mt-3 flex flex-col gap-3">
+				{#if hasAiPrefill(document)}
+					<div class="rounded-[1.2rem] border border-[#dce7eb] bg-[#f8fbfc] px-4 py-3 text-sm leading-6 text-[#45626c]">
+						Alcuni campi sono già stati precompilati dall'AI. Controllali e correggili prima di archiviare.
+					</div>
+				{/if}
+
+				{#if analysisDetails}
+					<div class={`rounded-[1.2rem] border px-4 py-3 text-sm leading-6 ${analysisDetails.provider === 'openai' ? 'border-[#cde7ec] bg-[#eef8fa] text-[#245766]' : 'border-[#dce7eb] bg-[#f8fbfc] text-[#45626c]'}`}>
+						<p class="font-semibold">
+							{analysisDetails.provider === 'openai' ? 'Analisi OpenAI attiva' : 'Analisi locale attiva'}
+						</p>
+						<p class="mt-1">
+							Fonte letta: {analysisDetails.sourceLabel}
+							{#if analysisDetails.provider === 'openai' && analysisDetails.model}
+								• modello {analysisDetails.model}
+							{/if}
+						</p>
+					</div>
+				{/if}
+
 				<div>
 					<label class="mb-1 block text-xs font-semibold uppercase tracking-[0.14em] text-[#6a8792]" for={`${formId}-title`}>Titolo</label>
 					<input id={`${formId}-title`} type="text" class="w-full rounded-2xl border border-[#d6e2e7] bg-white px-3 py-2.5 text-sm font-semibold text-[#173843] outline-none focus:border-[#0f5d6c]" placeholder="Es. Scontrino Conad 15/03" bind:value={title} />
@@ -340,7 +418,24 @@
 							</span>
 						{/each}
 					</div>
-					<input id={`${formId}-tags`} type="text" class="mt-1.5 w-full rounded-2xl border border-[#d6e2e7] bg-white px-3 py-2 text-sm text-[#173843] outline-none focus:border-[#0f5d6c]" placeholder="Aggiungi tag e premi Invio" bind:value={tagInput} onkeydown={handleTagKeydown} />
+					<form class="mt-1.5 flex gap-2" onsubmit={handleTagSubmit}>
+						<input
+							id={`${formId}-tags`}
+							type="text"
+							class="min-w-0 flex-1 rounded-2xl border border-[#d6e2e7] bg-white px-3 py-2 text-sm text-[#173843] outline-none focus:border-[#0f5d6c]"
+							placeholder="Aggiungi tag e premi Invio"
+							enterkeyhint="done"
+							autocapitalize="none"
+							bind:value={tagInput}
+							onkeydown={handleTagKeydown}
+						/>
+						<button
+							type="submit"
+							class="shrink-0 rounded-2xl border border-[#d7e1e8] bg-white px-3 py-2 text-sm font-semibold text-[#173843] transition-colors hover:bg-[#f6fafb]"
+						>
+							Aggiungi
+						</button>
+					</form>
 				</div>
 
 				<div>

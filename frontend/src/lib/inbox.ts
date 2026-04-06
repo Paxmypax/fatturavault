@@ -1,15 +1,17 @@
 import { browser } from '$app/environment';
 import { get, writable } from 'svelte/store';
-import type { Category, InvoiceData, WarrantyData } from '$lib/types';
+import type { Category, InboxAnalysisStatus, InvoiceData, WarrantyData } from '$lib/types';
 import {
 	deleteInboxDocument,
 	getMyInboxDocument,
 	isVaultInboxConfigured,
 	listMyInboxDocuments,
 	markInboxDocumentArchived,
+	updateInboxAiState,
 	upsertInboxDocument,
 	type InboxDocumentStatus as RemoteInboxDocumentStatus
 } from '$lib/ic/vaultInbox';
+import { analyzeInboxFile } from '$lib/inboxAnalysis';
 import {
 	deleteBlob,
 	downloadBlobBytes,
@@ -32,6 +34,7 @@ export type InboxDocument = {
 	sourceBlobId?: string;
 	previewBlobId?: string;
 	status: RemoteInboxDocumentStatus;
+	analysisStatus?: InboxAnalysisStatus;
 	title: string;
 	categoryName: string;
 	categoryId?: string;
@@ -55,7 +58,12 @@ export type InboxDocument = {
 	suggestedCategoryName?: string;
 	suggestedTags: string[];
 	extractedPayloadJson?: string;
+	extractedDocumentDate?: string;
+	extractedMerchantName?: string;
+	extractedAmount?: number;
+	extractedPaymentStatus?: 'due' | 'paid';
 	errorMessage?: string;
+	analysisUpdatedAt?: string;
 	previewDataUrl?: string;
 	fileDataUrl?: string;
 	remoteSyncState?: 'pending' | 'confirmed';
@@ -90,6 +98,179 @@ type PendingInboxArchiveFinalization = {
 
 const archiveFinalizationQueue: PendingInboxArchiveFinalization[] = [];
 let archiveFinalizationInFlight: Promise<void> | null = null;
+const MAX_UPLOAD_FILE_BYTES = 5 * 1024 * 1024;
+const IMAGE_COMPRESSION_TARGET_BYTES = 400 * 1024;
+const IMAGE_COMPRESSION_MAX_DIMENSION = 2200;
+const IMAGE_COMPRESSION_QUALITIES = [0.82, 0.72, 0.62, 0.52, 0.42];
+
+type ExtractedPayload = {
+	provider?: string;
+	title?: string | null;
+	categoryName?: string | null;
+	documentDate?: string | null;
+	merchantName?: string | null;
+	amount?: number | null;
+	paymentStatus?: 'due' | 'paid' | null;
+	tags?: string[] | null;
+	invoiceData?: {
+		invoiceType?: 'ricevuta' | 'emessa' | null;
+		invoiceNumber?: string | null;
+		supplier?: string | null;
+		vatNumber?: string | null;
+		netAmount?: number | null;
+		vatRate?: number | null;
+		vatAmount?: number | null;
+		totalAmount?: number | null;
+		lineItems?: Array<{
+			description?: string | null;
+			amount?: number | null;
+			vatRate?: number | null;
+		}> | null;
+	} | null;
+};
+
+function parseExtractedPayload(value: string | undefined): ExtractedPayload | null {
+	if (!value) {
+		return null;
+	}
+
+	try {
+		const parsed = JSON.parse(value) as ExtractedPayload;
+		return parsed && typeof parsed === 'object' ? parsed : null;
+	} catch {
+		return null;
+	}
+}
+
+function buildInboxPrefill(input: {
+	name: string;
+	extractedPayloadJson?: string;
+	suggestedTitle?: string;
+	suggestedCategoryName?: string;
+	suggestedTags?: string[];
+	extractedDocumentDate?: string;
+	extractedMerchantName?: string;
+	extractedAmount?: number;
+	extractedPaymentStatus?: 'due' | 'paid';
+}) {
+	const payload = parseExtractedPayload(input.extractedPayloadJson);
+	const llmProvider = payload?.provider === 'openai';
+
+	if (!llmProvider) {
+		return {
+			title: input.name,
+			categoryName: 'Altro',
+			documentDate: undefined,
+			tags: [] as string[],
+			merchantName: undefined,
+			amount: undefined,
+			paymentStatus: 'paid' as const
+		};
+	}
+
+	const title =
+		typeof payload?.title === 'string' && payload.title.trim()
+			? payload.title.trim()
+			: input.suggestedTitle?.trim() || input.name;
+	const categoryName =
+		typeof payload?.categoryName === 'string' && payload.categoryName.trim()
+			? payload.categoryName.trim()
+			: input.suggestedCategoryName?.trim() || 'Altro';
+	const documentDate =
+		typeof payload?.documentDate === 'string' && payload.documentDate.trim()
+			? payload.documentDate.trim()
+			: input.extractedDocumentDate;
+	const merchantName =
+		typeof payload?.merchantName === 'string' && payload.merchantName.trim()
+			? payload.merchantName.trim()
+			: input.extractedMerchantName;
+	const amount =
+		typeof payload?.amount === 'number' && Number.isFinite(payload.amount)
+			? payload.amount
+			: input.extractedAmount;
+	const paymentStatus =
+		payload?.paymentStatus === 'due' || payload?.paymentStatus === 'paid'
+			? payload.paymentStatus
+			: input.extractedPaymentStatus || 'paid';
+	const tags = Array.from(
+		new Set(
+			(Array.isArray(payload?.tags) ? payload.tags : input.suggestedTags ?? [])
+				.filter((tag): tag is string => typeof tag === 'string' && tag.trim().length >= 2)
+				.map((tag) => tag.trim().toLowerCase())
+		)
+	);
+	const invoiceData =
+		payload?.invoiceData &&
+		(
+			categoryName === 'Fattura' ||
+			categoryName === 'Ricevuta' ||
+			categoryName === 'Fiscale' ||
+			categoryName === 'Casa'
+		)
+			? {
+					invoiceType: (payload.invoiceData.invoiceType === 'emessa'
+						? 'emessa'
+						: 'ricevuta') as 'emessa' | 'ricevuta',
+					invoiceNumber:
+						typeof payload.invoiceData.invoiceNumber === 'string'
+							? payload.invoiceData.invoiceNumber.trim() || undefined
+							: undefined,
+					supplier:
+						typeof payload.invoiceData.supplier === 'string'
+							? payload.invoiceData.supplier.trim() || undefined
+							: merchantName,
+					vatNumber:
+						typeof payload.invoiceData.vatNumber === 'string'
+							? payload.invoiceData.vatNumber.trim() || undefined
+							: undefined,
+					netAmount:
+						typeof payload.invoiceData.netAmount === 'number' &&
+						Number.isFinite(payload.invoiceData.netAmount)
+							? payload.invoiceData.netAmount
+							: undefined,
+					vatRate:
+						typeof payload.invoiceData.vatRate === 'number' &&
+						Number.isFinite(payload.invoiceData.vatRate)
+							? payload.invoiceData.vatRate
+							: undefined,
+					vatAmount:
+						typeof payload.invoiceData.vatAmount === 'number' &&
+						Number.isFinite(payload.invoiceData.vatAmount)
+							? payload.invoiceData.vatAmount
+							: undefined,
+					totalAmount:
+						typeof payload.invoiceData.totalAmount === 'number' &&
+						Number.isFinite(payload.invoiceData.totalAmount)
+							? payload.invoiceData.totalAmount
+							: undefined,
+					lineItems: Array.isArray(payload.invoiceData.lineItems)
+						? payload.invoiceData.lineItems.map((item) => ({
+								description:
+									typeof item.description === 'string' ? item.description.trim() : '',
+								amount:
+									typeof item.amount === 'number' && Number.isFinite(item.amount)
+										? item.amount
+										: 0,
+								vatRate:
+									typeof item.vatRate === 'number' && Number.isFinite(item.vatRate)
+										? item.vatRate
+										: 22
+						  }))
+						: []
+				}
+			: undefined;
+
+	return {
+		title,
+		categoryName,
+		documentDate,
+		tags,
+		merchantName,
+		amount,
+		paymentStatus,
+		invoiceData
+	};
+}
 
 function normalizeInboxDocument(input: {
 	id: string;
@@ -99,16 +280,34 @@ function normalizeInboxDocument(input: {
 	sourceBlobId?: string;
 	previewBlobId?: string;
 	status: RemoteInboxDocumentStatus;
+	analysisStatus?: InboxAnalysisStatus;
 	ocrText?: string;
 	suggestedTitle?: string;
 	suggestedCategoryId?: string;
 	suggestedCategoryName?: string;
 	suggestedTags: string[];
 	extractedPayloadJson?: string;
+	extractedDocumentDate?: string;
+	extractedMerchantName?: string;
+	extractedAmount?: number;
+	extractedPaymentStatus?: 'due' | 'paid';
 	errorMessage?: string;
+	analysisUpdatedAt?: string;
 	createdAt: string;
 	updatedAt: string;
 }): InboxDocument {
+	const prefill = buildInboxPrefill({
+		name: input.name,
+		extractedPayloadJson: input.extractedPayloadJson,
+		suggestedTitle: input.suggestedTitle,
+		suggestedCategoryName: input.suggestedCategoryName,
+		suggestedTags: input.suggestedTags,
+		extractedDocumentDate: input.extractedDocumentDate,
+		extractedMerchantName: input.extractedMerchantName,
+		extractedAmount: input.extractedAmount,
+		extractedPaymentStatus: input.extractedPaymentStatus
+	});
+
 	return {
 		id: input.id,
 		name: input.name,
@@ -117,23 +316,44 @@ function normalizeInboxDocument(input: {
 		sourceBlobId: input.sourceBlobId,
 		previewBlobId: input.previewBlobId,
 		status: input.status,
-		title: input.suggestedTitle || input.name,
-		categoryName: input.suggestedCategoryName || 'Altro',
-		categoryId: input.suggestedCategoryId,
+		analysisStatus: input.analysisStatus,
+		title: prefill.title,
+		categoryName: prefill.categoryName,
+		categoryId: undefined,
 		createdAt: input.createdAt,
 		updatedAt: input.updatedAt,
-		tags: input.suggestedTags ?? [],
-		paymentStatus: 'paid',
+		documentDate: prefill.documentDate,
+		tags: prefill.tags,
+		merchantName: prefill.merchantName,
+		amount: prefill.amount,
+		paymentStatus: prefill.paymentStatus,
 		hasExpiry: false,
+		invoiceData: prefill.invoiceData,
 		ocrText: input.ocrText,
 		suggestedTitle: input.suggestedTitle,
 		suggestedCategoryId: input.suggestedCategoryId,
 		suggestedCategoryName: input.suggestedCategoryName,
 		suggestedTags: input.suggestedTags ?? [],
 		extractedPayloadJson: input.extractedPayloadJson,
+		extractedDocumentDate: input.extractedDocumentDate,
+		extractedMerchantName: input.extractedMerchantName,
+		extractedAmount: input.extractedAmount,
+		extractedPaymentStatus: input.extractedPaymentStatus,
 		errorMessage: input.errorMessage,
+		analysisUpdatedAt: input.analysisUpdatedAt,
 		remoteSyncState: 'confirmed',
 		sourceScope: 'inbox'
+	};
+}
+
+function mergeInboxDocumentWithLocalState(
+	remoteDocument: InboxDocument,
+	localDocument?: InboxDocument | null
+) {
+	return {
+		...remoteDocument,
+		previewDataUrl: localDocument?.previewDataUrl,
+		fileDataUrl: localDocument?.fileDataUrl
 	};
 }
 
@@ -180,9 +400,155 @@ function createLocalObjectUrl(file: File) {
 	}
 }
 
+function formatBytesLabel(bytes: number) {
+	if (!Number.isFinite(bytes) || bytes <= 0) {
+		return '0 MB';
+	}
+
+	if (bytes < 1024 * 1024) {
+		return `${(bytes / 1024).toFixed(0)} KB`;
+	}
+
+	return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function normalizeInboxUploadError(error: unknown, fileName?: string) {
+	if (!(error instanceof Error)) {
+		return 'Il file non rispetta i limiti di upload.';
+	}
+
+	const message = error.message;
+	if (message.includes('5 MB')) {
+		return message;
+	}
+
+	if (message.includes('500 MB')) {
+		return 'Hai raggiunto il limite della inbox temporanea di 500 MB. Elimina o archivia qualche file prima di continuare.';
+	}
+
+	if (message.includes('5 GB')) {
+		return 'Hai raggiunto il limite del vault personale di 5 GB. Elimina qualche file prima di continuare.';
+	}
+
+	if (message.includes('QuotaExceeded')) {
+		return 'Lo spazio locale del browser è pieno. Chiudi qualche file o riprova dopo il salvataggio.';
+	}
+
+	return fileName ? `Impossibile caricare "${fileName}". ${message}` : message;
+}
+
+function renameFileWithExtension(name: string, extension: string) {
+	const sanitizedExtension = extension.replace(/^\./, '');
+	const dotIndex = name.lastIndexOf('.');
+	const baseName = dotIndex > 0 ? name.slice(0, dotIndex) : name;
+	return `${baseName}.${sanitizedExtension}`;
+}
+
+async function loadImageElement(file: File) {
+	const objectUrl = URL.createObjectURL(file);
+
+	try {
+		const image = new Image();
+		image.decoding = 'async';
+		await new Promise<void>((resolve, reject) => {
+			image.onload = () => resolve();
+			image.onerror = () => reject(new Error('Impossibile leggere l’immagine.'));
+			image.src = objectUrl;
+		});
+		return image;
+	} finally {
+		URL.revokeObjectURL(objectUrl);
+	}
+}
+
+async function canvasToJpegBlob(
+	canvas: HTMLCanvasElement,
+	quality: number
+): Promise<Blob | null> {
+	return await new Promise((resolve) => {
+		canvas.toBlob((blob) => resolve(blob), 'image/jpeg', quality);
+	});
+}
+
+async function compressImageForUpload(file: File): Promise<File> {
+	if (!browser || typeof document === 'undefined' || file.size <= MAX_UPLOAD_FILE_BYTES) {
+		return file;
+	}
+
+	const image = await loadImageElement(file);
+	const largestSide = Math.max(image.naturalWidth || image.width, image.naturalHeight || image.height);
+	const initialScale =
+		largestSide > IMAGE_COMPRESSION_MAX_DIMENSION
+			? IMAGE_COMPRESSION_MAX_DIMENSION / largestSide
+			: 1;
+	let scale = initialScale;
+	let bestBlob: Blob | null = null;
+
+	for (let pass = 0; pass < 4; pass += 1) {
+		const canvas = document.createElement('canvas');
+		canvas.width = Math.max(1, Math.round((image.naturalWidth || image.width) * scale));
+		canvas.height = Math.max(1, Math.round((image.naturalHeight || image.height) * scale));
+
+		const context = canvas.getContext('2d');
+		if (!context) {
+			throw new Error('Impossibile comprimere l’immagine in questo browser.');
+		}
+
+		context.drawImage(image, 0, 0, canvas.width, canvas.height);
+
+		for (const quality of IMAGE_COMPRESSION_QUALITIES) {
+			const candidate = await canvasToJpegBlob(canvas, quality);
+			if (!candidate) {
+				continue;
+			}
+
+			if (!bestBlob || candidate.size < bestBlob.size) {
+				bestBlob = candidate;
+			}
+
+			if (
+				candidate.size <= MAX_UPLOAD_FILE_BYTES &&
+				(candidate.size <= IMAGE_COMPRESSION_TARGET_BYTES || pass >= 1)
+			) {
+				return new File([candidate], renameFileWithExtension(file.name, 'jpg'), {
+					type: 'image/jpeg',
+					lastModified: file.lastModified
+				});
+			}
+		}
+
+		scale *= 0.82;
+	}
+
+	if (bestBlob && bestBlob.size <= MAX_UPLOAD_FILE_BYTES) {
+		return new File([bestBlob], renameFileWithExtension(file.name, 'jpg'), {
+			type: 'image/jpeg',
+			lastModified: file.lastModified
+		});
+	}
+
+	throw new Error(
+		`L'immagine supera il limite di 5 MB anche dopo la compressione automatica. Dimensione attuale: ${formatBytesLabel(file.size)}.`
+	);
+}
+
+async function prepareFileForInboxUpload(file: File): Promise<File> {
+	if (file.size <= MAX_UPLOAD_FILE_BYTES) {
+		return file;
+	}
+
+	if (file.type.startsWith('image/')) {
+		return await compressImageForUpload(file);
+	}
+
+	throw new Error(
+		`"${file.name}" supera il limite di 5 MB. I PDF passano così come sono solo se restano entro 5 MB.`
+	);
+}
+
 function mergeDocuments(remoteDocuments: InboxDocument[], localDocuments: InboxDocument[]) {
 	const localById = new Map(localDocuments.map((document) => [document.id, document]));
-	return remoteDocuments
+	const merged = remoteDocuments
 		.filter(
 			(document) =>
 				document.status !== 'archived' && !pendingArchivedInboxIds.has(document.id)
@@ -194,8 +560,21 @@ function mergeDocuments(remoteDocuments: InboxDocument[], localDocuments: InboxD
 				previewDataUrl: local?.previewDataUrl,
 				fileDataUrl: local?.fileDataUrl
 			};
-		})
-		.sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+		});
+
+	const remoteIds = new Set(merged.map((document) => document.id));
+	const pendingLocalDocuments = localDocuments.filter(
+		(document) =>
+			!remoteIds.has(document.id) &&
+			!pendingArchivedInboxIds.has(document.id) &&
+			(document.status === 'processing' ||
+				document.status === 'error' ||
+				document.remoteSyncState === 'pending')
+	);
+
+	return [...merged, ...pendingLocalDocuments].sort(
+		(a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+	);
 }
 
 async function syncRemoteInbox() {
@@ -248,56 +627,146 @@ export function getInboxDocumentById(id: string) {
 	return get(inboxStore).documents.find((document) => document.id === id) ?? null;
 }
 
+export async function refreshInboxDocument(documentId: string) {
+	if (!browser || !documentId || !isVaultInboxConfigured()) {
+		return null;
+	}
+
+	const remoteDocument = await getMyInboxDocument(documentId);
+	if (!remoteDocument) {
+		return null;
+	}
+
+	const normalizedRemoteDocument = normalizeInboxDocument({
+		id: remoteDocument.id,
+		name: remoteDocument.name,
+		size: remoteDocument.size,
+		type: remoteDocument.type,
+		sourceBlobId: remoteDocument.sourceBlobId,
+		previewBlobId: remoteDocument.previewBlobId,
+		status: remoteDocument.status,
+		analysisStatus: remoteDocument.analysisStatus,
+		ocrText: remoteDocument.ocrText,
+		suggestedTitle: remoteDocument.suggestedTitle,
+		suggestedCategoryId: remoteDocument.suggestedCategoryId,
+		suggestedCategoryName: remoteDocument.suggestedCategoryName,
+		suggestedTags: remoteDocument.suggestedTags,
+		extractedPayloadJson: remoteDocument.extractedPayloadJson,
+		extractedDocumentDate: remoteDocument.extractedDocumentDate,
+		extractedMerchantName: remoteDocument.extractedMerchantName,
+		extractedAmount: remoteDocument.extractedAmount,
+		extractedPaymentStatus: remoteDocument.extractedPaymentStatus,
+		errorMessage: remoteDocument.errorMessage,
+		analysisUpdatedAt: remoteDocument.analysisUpdatedAt,
+		createdAt: remoteDocument.createdAt,
+		updatedAt: remoteDocument.updatedAt
+	});
+
+	inboxStore.update((state) => {
+		const existing = state.documents.find((document) => document.id === documentId);
+		const mergedDocument = mergeInboxDocumentWithLocalState(normalizedRemoteDocument, existing);
+		const alreadyPresent = Boolean(existing);
+
+		return {
+			ready: true,
+			documents: (
+				alreadyPresent
+					? state.documents.map((document) =>
+							document.id === documentId ? mergedDocument : document
+						)
+					: [mergedDocument, ...state.documents]
+			).sort(
+				(a, b) =>
+					new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+			)
+		};
+	});
+
+	return normalizedRemoteDocument;
+}
+
 export async function addInboxDocuments(files: File[]) {
 	if (!browser || !files.length) {
 		return [];
 	}
 
 	const now = new Date().toISOString();
-	const preparedDocuments = files.map((file) => {
+	const uploadEntries: Array<{ uploadFile: File; baseDocument: InboxDocument }> = [];
+	const rejectedDocuments: InboxDocument[] = [];
+
+	for (const file of files) {
 		const id = createClientId();
-		const fileDataUrl = createLocalObjectUrl(file);
-		const previewDataUrl = file.type.startsWith('image/') ? fileDataUrl : undefined;
 
-		if (fileDataUrl) {
-			rememberBlobUrl(`${id}:original`, fileDataUrl);
+		try {
+			const uploadFile = await prepareFileForInboxUpload(file);
+			const fileDataUrl = createLocalObjectUrl(uploadFile);
+			const previewDataUrl = uploadFile.type.startsWith('image/') ? fileDataUrl : undefined;
+
+			if (fileDataUrl) {
+				rememberBlobUrl(`${id}:original`, fileDataUrl);
+			}
+
+			if (previewDataUrl) {
+				rememberBlobUrl(`${id}:preview`, previewDataUrl);
+			}
+
+			uploadEntries.push({
+				uploadFile,
+				baseDocument: {
+					id,
+					name: uploadFile.name,
+					size: uploadFile.size,
+					type: uploadFile.type || 'application/octet-stream',
+					status: 'processing' as const,
+					analysisStatus: 'idle' as const,
+					title: uploadFile.name,
+					categoryName: 'Altro',
+					createdAt: now,
+					updatedAt: now,
+					tags: [],
+					suggestedTags: [],
+					paymentStatus: 'paid' as const,
+					hasExpiry: false,
+					previewDataUrl,
+					fileDataUrl,
+					sourceScope: 'inbox' as const
+				}
+			});
+		} catch (error) {
+			rejectedDocuments.push({
+				id,
+				name: file.name,
+				size: file.size,
+				type: file.type || 'application/octet-stream',
+				status: 'error' as const,
+				analysisStatus: 'error' as const,
+				title: file.name,
+				categoryName: 'Altro',
+				createdAt: now,
+				updatedAt: now,
+				tags: [],
+				suggestedTags: [],
+				paymentStatus: 'paid' as const,
+				hasExpiry: false,
+				errorMessage:
+					normalizeInboxUploadError(error, file.name),
+				sourceScope: 'inbox' as const
+			});
 		}
+	}
 
-		if (previewDataUrl) {
-			rememberBlobUrl(`${id}:preview`, previewDataUrl);
-		}
-
-		return {
-			id,
-			name: file.name,
-			size: file.size,
-			type: file.type || 'application/octet-stream',
-			status: 'processing' as const,
-			title: file.name,
-			categoryName: 'Altro',
-			createdAt: now,
-			updatedAt: now,
-			tags: [],
-			suggestedTags: [],
-			paymentStatus: 'paid' as const,
-			hasExpiry: false,
-			previewDataUrl,
-			fileDataUrl,
-			sourceScope: 'inbox' as const
-		} satisfies InboxDocument;
-	});
+	const preparedDocuments = uploadEntries.map(({ baseDocument }) => baseDocument);
 
 	inboxStore.update((state) => ({
 		ready: true,
-		documents: [...preparedDocuments, ...state.documents]
+		documents: [...preparedDocuments, ...rejectedDocuments, ...state.documents]
 	}));
 
 	if (!isVaultInboxConfigured() || !isVaultStorageConfigured()) {
-		return preparedDocuments;
+		return [...preparedDocuments, ...rejectedDocuments];
 	}
 
-	for (const [index, file] of files.entries()) {
-		const baseDocument = preparedDocuments[index];
+	for (const { uploadFile: file, baseDocument } of uploadEntries) {
 		try {
 			await upsertInboxDocument({
 				id: baseDocument.id,
@@ -328,7 +797,7 @@ export async function addInboxDocuments(files: File[]) {
 				type: baseDocument.type,
 				sourceBlobId,
 				previewBlobId,
-				status: 'ready_for_review',
+				status: 'processing',
 				createdAt: baseDocument.createdAt
 			});
 
@@ -346,6 +815,87 @@ export async function addInboxDocuments(files: File[]) {
 							: document
 					)
 				}));
+
+				try {
+					inboxStore.update((state) => ({
+						ready: true,
+						documents: state.documents.map((document) =>
+							document.id === baseDocument.id
+								? {
+										...document,
+										status: 'processing',
+										analysisStatus: 'processing'
+									}
+								: document
+						)
+					}));
+
+					const analysis = await analyzeInboxFile(file);
+					const analyzedRemoteDocument = await updateInboxAiState({
+						documentId: baseDocument.id,
+						status: 'ready_for_review',
+						analysisStatus: analysis.analysisStatus,
+						ocrText: analysis.ocrText,
+						suggestedTitle: analysis.suggestedTitle,
+						suggestedCategoryName: analysis.suggestedCategoryName,
+						suggestedTags: analysis.suggestedTags,
+						extractedPayloadJson: analysis.extractedPayloadJson,
+						extractedDocumentDate: analysis.extractedDocumentDate,
+						extractedMerchantName: analysis.extractedMerchantName,
+						extractedAmount: analysis.extractedAmount,
+						extractedPaymentStatus: analysis.extractedPaymentStatus
+					});
+
+					if (analyzedRemoteDocument) {
+						inboxStore.update((state) => ({
+							ready: true,
+							documents: state.documents.map((document) =>
+								document.id === baseDocument.id
+									? mergeInboxDocumentWithLocalState(
+											normalizeInboxDocument(analyzedRemoteDocument),
+											document
+										)
+									: document
+							)
+						}));
+					}
+				} catch (analysisError) {
+					console.warn("Impossibile completare l'analisi iniziale del documento inbox.", analysisError);
+					const fallbackRemoteDocument = await updateInboxAiState({
+						documentId: baseDocument.id,
+						status: 'ready_for_review',
+						analysisStatus: 'error',
+						errorMessage:
+							analysisError instanceof Error
+								? analysisError.message
+								: 'Analisi inbox non riuscita.'
+					}).catch((error: unknown) => {
+						console.warn("Impossibile aggiornare lo stato finale del documento inbox.", error);
+						return null;
+					});
+
+					inboxStore.update((state) => ({
+						ready: true,
+						documents: state.documents.map((document) =>
+							document.id === baseDocument.id
+									? fallbackRemoteDocument
+										? mergeInboxDocumentWithLocalState(
+												normalizeInboxDocument(fallbackRemoteDocument),
+												document
+											)
+										: {
+												...document,
+												status: 'ready_for_review' as const,
+												analysisStatus: 'error' as const,
+												errorMessage:
+													analysisError instanceof Error
+														? analysisError.message
+														: 'Analisi inbox non riuscita.'
+											}
+									: document
+						)
+					}));
+				}
 			}
 		} catch (error) {
 			console.warn('Impossibile salvare il documento inbox sul backend ICP.', error);
@@ -370,9 +920,7 @@ export async function addInboxDocuments(files: File[]) {
 										previewDataUrl: document.previewDataUrl,
 										fileDataUrl: document.fileDataUrl,
 										errorMessage:
-											error instanceof Error
-												? error.message
-												: 'Caricamento inbox non riuscito.'
+											normalizeInboxUploadError(error, baseDocument.name)
 									}
 								: document
 						)
@@ -380,12 +928,26 @@ export async function addInboxDocuments(files: File[]) {
 				}
 			} catch (innerError) {
 				console.warn('Impossibile aggiornare lo stato errore del documento inbox.', innerError);
+				inboxStore.update((state) => ({
+					ready: true,
+					documents: state.documents.map((document) =>
+						document.id === baseDocument.id
+							? {
+									...document,
+									status: 'error',
+									analysisStatus: 'error',
+									errorMessage:
+										normalizeInboxUploadError(error, baseDocument.name)
+								}
+							: document
+					)
+				}));
 			}
 		}
 	}
 
 	void syncRemoteInbox();
-	return preparedDocuments;
+	return [...preparedDocuments, ...rejectedDocuments];
 }
 
 export async function ensureInboxDocumentAssets(

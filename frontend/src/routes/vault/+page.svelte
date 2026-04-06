@@ -9,6 +9,7 @@
 	} from '$lib/auth';
 	import CategoryBadge from '$lib/components/CategoryBadge.svelte';
 	import CategoryDropdown from '$lib/components/CategoryDropdown.svelte';
+	import NotificationBell from '$lib/components/NotificationBell.svelte';
 	import { analyticsAccessState, initAnalyticsAccess } from '$lib/stores/analyticsAccess';
 	import { categoriesState, getCategoryByName, initCategories } from '$lib/stores/categories';
 	import {
@@ -371,13 +372,13 @@
 					</svg>
 					Impostazioni
 				</a>
-				<button class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" type="button">
+				<a class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" href="/supporto">
 					<svg aria-hidden="true" class="h-6 w-6 shrink-0 text-[#3e5963]" fill="none" viewBox="0 0 24 24">
 						<path d="M12 20c4.42 0 8-3.36 8-7.5S16.42 5 12 5 4 8.36 4 12.5c0 1.97.81 3.77 2.14 5.1L5 21l3.83-1.12A8.54 8.54 0 0 0 12 20Z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.7" />
 						<path d="M9.2 10.3h5.6M9.2 13.7h3.8" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" />
 					</svg>
 					Supporto
-				</button>
+				</a>
 				<button class="mt-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#8f4040] transition-colors hover:bg-[#fff1f1]" type="button" onclick={logout}>
 					<svg aria-hidden="true" class="h-6 w-6 shrink-0 text-[#8f4040]" fill="none" viewBox="0 0 24 24">
 						<path d="M10 5H7.8A2.8 2.8 0 0 0 5 7.8v8.4A2.8 2.8 0 0 0 7.8 19H10" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" />
@@ -392,11 +393,7 @@
 		<div class="relative z-10 flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
 			<header class="relative z-30 border-b border-[#dbe5ea] bg-white/62 px-5 py-4 backdrop-blur sm:px-8">
 				<div class="flex items-center justify-end gap-4">
-					<button aria-label="Notifiche" class="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/80 bg-white/80 text-[#29414a] shadow-[0_10px_25px_rgba(148,163,184,0.1)] transition-transform hover:-translate-y-0.5" type="button">
-						<svg aria-hidden="true" class="h-6 w-6" fill="none" viewBox="0 0 24 24">
-							<path d="M6.8 16.3H17.2L16 14.5V10a4 4 0 1 0-8 0v4.5l-1.2 1.8ZM10.1 18.6a2.1 2.1 0 0 0 3.8 0" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.7" />
-						</svg>
-					</button>
+					<NotificationBell />
 
 					<div class="relative">
 						<button class="flex items-center gap-3 rounded-full border border-white/80 bg-white/82 px-4 py-3 shadow-[0_10px_25px_rgba(148,163,184,0.1)] transition-transform hover:-translate-y-0.5" type="button" onclick={() => (showDisplayNameEditor = !showDisplayNameEditor)}>

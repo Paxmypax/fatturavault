@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { goto } from '$app/navigation';
 	import {
 		authState,
@@ -82,6 +82,14 @@
 		return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 	}
 
+	function isPdfDocument(value: { type?: string; name?: string } | null) {
+		if (!value) return false;
+		return (
+			value.type?.toLowerCase().includes('pdf') === true ||
+			value.name?.toLowerCase().endsWith('.pdf') === true
+		);
+	}
+
 	let documentData = $derived(
 		documentId
 			? $vaultState.documents.find((document) => document.id === documentId) ??
@@ -92,9 +100,7 @@
 	);
 
 	$effect(() => {
-		if (!documentData || !documentId) {
-			return;
-		}
+		if (!documentData || !documentId) return;
 
 		if (
 			!documentData.previewDataUrl &&
@@ -199,13 +205,13 @@
 					</svg>
 					Impostazioni
 				</a>
-				<button class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" type="button">
+				<a class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" href="/supporto">
 					<svg aria-hidden="true" class="h-6 w-6 shrink-0 text-[#3e5963]" fill="none" viewBox="0 0 24 24">
 						<path d="M12 20c4.42 0 8-3.36 8-7.5S16.42 5 12 5 4 8.36 4 12.5c0 1.97.81 3.77 2.14 5.1L5 21l3.83-1.12A8.54 8.54 0 0 0 12 20Z" stroke="currentColor" stroke-linejoin="round" stroke-width="1.7" />
 						<path d="M9.2 10.3h5.6M9.2 13.7h3.8" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" />
 					</svg>
 					Supporto
-				</button>
+				</a>
 				<button class="mt-2 flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-lg font-medium text-[#8f4040] transition-colors hover:bg-[#fff1f1]" type="button" onclick={logout}>
 					Esci
 				</button>
@@ -259,7 +265,15 @@
 								<div class="rounded-[1.5rem] border border-[#e3edf1] bg-[#f8fbfc] p-4">
 									{#if documentData.previewDataUrl}
 										<div class="overflow-hidden rounded-[1.2rem] border border-[#dbe7eb] bg-white">
-											<img alt={documentData.name} class="max-h-[500px] w-full object-contain" src={documentData.previewDataUrl} />
+											{#if isPdfDocument(documentData)}
+												<iframe
+													title={documentData.name}
+													src={documentData.previewDataUrl}
+													class="h-[70vh] min-h-[520px] w-full bg-white"
+												></iframe>
+											{:else}
+												<img alt={documentData.name} class="max-h-[500px] w-full object-contain" src={documentData.previewDataUrl} />
+											{/if}
 										</div>
 									{:else}
 										<div class="flex flex-col items-center justify-center py-16 text-center">
@@ -275,7 +289,7 @@
 												{#if isPreviewLoading}
 													Stiamo recuperando e decifrando il file. Potrebbe volerci qualche secondo.
 												{:else}
-													L'anteprima è disponibile per le immagini.
+													L'anteprima è disponibile per immagini e PDF.
 												{/if}
 											</p>
 										</div>
@@ -301,4 +315,5 @@
 		</div>
 	</div>
 </div>
+
 
