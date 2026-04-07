@@ -1,6 +1,7 @@
-use candid::{decode_one, encode_one, CandidType, Principal};
+﻿use candid::{decode_one, encode_one, CandidType, Principal};
 use fatturavault_shared::{
     default_categories_for, default_security_state, ActivityRecord, ActivityType, CategoryRecord,
+    DashboardSuggestionRecord,
     DocumentRecord, DocumentStatus, DocumentUpsertInput, NoteRecord, NotificationBroadcastRecord,
     NotificationReceiptRecord, NotificationViewRecord, OnchainVaultSummaryResponse,
     OnchainVaultChatResponse, PaymentStatus, PostItRecord, SecurityState, UserProfile,
@@ -359,11 +360,11 @@ fn payment_status_label(status: &PaymentStatus) -> &'static str {
 fn normalize_question_text(value: &str) -> String {
     value
         .to_lowercase()
-        .replace(['à', 'á'], "a")
-        .replace(['è', 'é'], "e")
-        .replace(['ì', 'í'], "i")
-        .replace(['ò', 'ó'], "o")
-        .replace(['ù', 'ú'], "u")
+        .replace(['\u{00E0}', '\u{00E1}'], "a")
+        .replace(['\u{00E8}', '\u{00E9}'], "e")
+        .replace(['\u{00EC}', '\u{00ED}'], "i")
+        .replace(['\u{00F2}', '\u{00F3}'], "o")
+        .replace(['\u{00F9}', '\u{00FA}'], "u")
         .replace(['?', '!', ',', '.', ':', ';', '(', ')', '"', '\''], " ")
 }
 
@@ -444,6 +445,68 @@ fn question_mentions_due_documents(question: &str) -> bool {
 
 fn format_amount_eur(amount: f64) -> String {
     format!("{amount:.2} euro").replace('.', ",")
+}
+
+fn is_leap_year(year: i32) -> bool {
+    (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
+}
+
+fn days_in_month(year: i32, month: u32) -> Option<u32> {
+    match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => Some(31),
+        4 | 6 | 9 | 11 => Some(30),
+        2 => Some(if is_leap_year(year) { 29 } else { 28 }),
+        _ => None,
+    }
+}
+
+fn days_from_civil(year: i32, month: u32, day: u32) -> i64 {
+    let adjusted_year = year - if month <= 2 { 1 } else { 0 };
+    let era = if adjusted_year >= 0 {
+        adjusted_year / 400
+    } else {
+        (adjusted_year - 399) / 400
+    };
+    let year_of_era = adjusted_year - era * 400;
+    let month_prime = month as i32 + if month > 2 { -3 } else { 9 };
+    let day_of_year = (153 * month_prime + 2) / 5 + day as i32 - 1;
+    let day_of_era = year_of_era * 365 + year_of_era / 4 - year_of_era / 100 + day_of_year;
+    (era * 146_097 + day_of_era - 719_468) as i64
+}
+
+fn parse_date_to_epoch_days(value: &str) -> Option<i64> {
+    let normalized = value.trim().replace('.', "/").replace('-', "/");
+    let parts: Vec<&str> = normalized.split('/').map(str::trim).collect();
+    if parts.len() != 3 {
+        return None;
+    }
+
+    let (year, month, day) = if parts[0].len() == 4 {
+        let year = parts[0].parse::<i32>().ok()?;
+        let month = parts[1].parse::<u32>().ok()?;
+        let day = parts[2].parse::<u32>().ok()?;
+        (year, month, day)
+    } else {
+        let day = parts[0].parse::<u32>().ok()?;
+        let month = parts[1].parse::<u32>().ok()?;
+        let year = parts[2].parse::<i32>().ok()?;
+        (year, month, day)
+    };
+
+    let max_day = days_in_month(year, month)?;
+    if day == 0 || day > max_day {
+        return None;
+    }
+
+    Some(days_from_civil(year, month, day))
+}
+
+fn current_epoch_days(now_ns: u64) -> i64 {
+    (now_ns / DAY_NS) as i64
+}
+
+fn days_until_date(now_ns: u64, value: &str) -> Option<i64> {
+    parse_date_to_epoch_days(value).map(|target_days| target_days - current_epoch_days(now_ns))
 }
 
 fn question_mentions_hosting(question: &str) -> bool {
@@ -558,6 +621,189 @@ fn document_matches_hosting(document: &DocumentRecord) -> bool {
             "google cloud",
         ],
     )
+}
+
+fn build_dashboard_suggestions(owner: Principal) -> Vec<DashboardSuggestionRecord> {
+    let now = now_ns();
+    let processed_documents: Vec<DocumentRecord> = documents_for(owner)
+        .into_iter()
+        .filter(is_countable_processed_document)
+        .collect();
+
+    let due_documents: Vec<&DocumentRecord> = processed_documents
+        .iter()
+        .filter(|document| document.payment_status == PaymentStatus::Due)
+        .collect();
+
+    let expiring_documents: Vec<(&DocumentRecord, i64)> = processed_documents
+        .iter()
+        .filter_map(|document| {
+            let expiry_date = document.expiry_date.as_deref()?;
+            let days_until = days_until_date(now, expiry_date)?;
+            ((0..=30).contains(&days_until)).then_some((document, days_until))
+        })
+        .collect();
+
+    let hosting_documents: Vec<&DocumentRecord> = processed_documents
+        .iter()
+        .filter(|document| document_matches_hosting(document))
+        .collect();
+
+    let untagged_documents: Vec<&DocumentRecord> = processed_documents
+        .iter()
+        .filter(|document| document.tags.is_empty())
+        .collect();
+
+    let mut suggestions = Vec::new();
+
+    if !due_documents.is_empty() {
+        let titles = due_documents
+            .iter()
+            .take(3)
+            .map(|document| {
+                if document.title.trim().is_empty() {
+                    document.name.clone()
+                } else {
+                    document.title.clone()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+        let total_due = due_documents
+            .iter()
+            .filter_map(|document| document_effective_amount(document))
+            .sum::<f64>();
+        let has_amount = due_documents
+            .iter()
+            .any(|document| document_effective_amount(document).is_some());
+
+        suggestions.push(DashboardSuggestionRecord {
+            id: "due-documents".to_string(),
+            title: if due_documents.len() == 1 {
+                "Hai 1 documento da pagare".to_string()
+            } else {
+                format!("Hai {} documenti da pagare", due_documents.len())
+            },
+            body: if has_amount {
+                format!(
+                    "Conviene partire da questi documenti aperti: {}. Il totale da saldare e {}.",
+                    titles,
+                    format_amount_eur(total_due)
+                )
+            } else {
+                format!("Conviene partire da questi documenti aperti: {}.", titles)
+            },
+            tone: "warning".to_string(),
+            cta_label: Some("Controlla i pagamenti".to_string()),
+            cta_href: Some("/vault".to_string()),
+        });
+    }
+
+    if !expiring_documents.is_empty() {
+        let mut expiring_documents = expiring_documents;
+        expiring_documents.sort_by_key(|(_, days_until)| *days_until);
+
+        let preview = expiring_documents
+            .iter()
+            .take(3)
+            .map(|(document, days_until)| {
+                let title = if document.title.trim().is_empty() {
+                    document.name.clone()
+                } else {
+                    document.title.clone()
+                };
+                if *days_until == 0 {
+                    format!("{title} oggi")
+                } else if *days_until == 1 {
+                    format!("{title} domani")
+                } else {
+                    format!("{title} tra {} giorni", days_until)
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        suggestions.push(DashboardSuggestionRecord {
+            id: "expiring-documents".to_string(),
+            title: if expiring_documents.len() == 1 {
+                "Hai 1 documento in scadenza entro 30 giorni".to_string()
+            } else {
+                format!(
+                    "Hai {} documenti in scadenza entro 30 giorni",
+                    expiring_documents.len()
+                )
+            },
+            body: format!("Le scadenze piu vicine sono: {}.", preview),
+            tone: "warning".to_string(),
+            cta_label: Some("Verifica le scadenze".to_string()),
+            cta_href: Some("/vault".to_string()),
+        });
+    }
+
+    let hosting_total = hosting_documents
+        .iter()
+        .filter_map(|document| document_effective_amount(document))
+        .sum::<f64>();
+    let hosting_has_amount = hosting_documents
+        .iter()
+        .any(|document| document_effective_amount(document).is_some());
+
+    if !hosting_documents.is_empty() && hosting_has_amount {
+        suggestions.push(DashboardSuggestionRecord {
+            id: "hosting-spend".to_string(),
+            title: "Spese hosting e server rilevate".to_string(),
+            body: format!(
+                "Nel vault risultano {} documenti collegati a hosting, server o domini, per un totale di {}.",
+                hosting_documents.len(),
+                format_amount_eur(hosting_total)
+            ),
+            tone: "info".to_string(),
+            cta_label: Some("Rivedi spese hosting".to_string()),
+            cta_href: Some("/dashboard".to_string()),
+        });
+    }
+
+    if !untagged_documents.is_empty() {
+        let titles = untagged_documents
+            .iter()
+            .take(3)
+            .map(|document| {
+                if document.title.trim().is_empty() {
+                    document.name.clone()
+                } else {
+                    document.title.clone()
+                }
+            })
+            .collect::<Vec<_>>()
+            .join(", ");
+
+        suggestions.push(DashboardSuggestionRecord {
+            id: "untagged-documents".to_string(),
+            title: if untagged_documents.len() == 1 {
+                "Hai 1 documento senza tag".to_string()
+            } else {
+                format!("Hai {} documenti senza tag", untagged_documents.len())
+            },
+            body: format!("Per ritrovarli meglio in seguito, puoi sistemare per primi: {}.", titles),
+            tone: "info".to_string(),
+            cta_label: Some("Sistema i tag".to_string()),
+            cta_href: Some("/vault".to_string()),
+        });
+    }
+
+    if suggestions.is_empty() {
+        suggestions.push(DashboardSuggestionRecord {
+            id: "vault-healthy".to_string(),
+            title: "Il vault e in ordine".to_string(),
+            body: "Non risultano documenti da pagare, scadenze ravvicinate o elementi che richiedono attenzione immediata.".to_string(),
+            tone: "positive".to_string(),
+            cta_label: Some("Apri la dashboard".to_string()),
+            cta_href: Some("/dashboard".to_string()),
+        });
+    }
+
+    suggestions.truncate(4);
+    suggestions
 }
 
 fn is_countable_processed_document(document: &DocumentRecord) -> bool {
@@ -998,7 +1244,7 @@ fn ensure_unique_category_name(
 ) -> Result<(), String> {
     let lowered = normalize_name(next_name);
     if lowered.is_empty() {
-        return Err("Il nome categoria non può essere vuoto.".to_string());
+        return Err("Il nome categoria non puÃ² essere vuoto.".to_string());
     }
 
     let exists_in_defaults = default_categories_for(owner).into_iter().any(|category| {
@@ -1006,7 +1252,7 @@ fn ensure_unique_category_name(
             && normalize_name(&category.name) == lowered
     });
     if exists_in_defaults {
-        return Err("Esiste già una categoria con questo nome.".to_string());
+        return Err("Esiste giÃ  una categoria con questo nome.".to_string());
     }
 
     let exists_in_custom = stored_categories_for(owner).into_iter().any(|category| {
@@ -1014,7 +1260,7 @@ fn ensure_unique_category_name(
             && normalize_name(&category.name) == lowered
     });
     if exists_in_custom {
-        return Err("Esiste già una categoria con questo nome.".to_string());
+        return Err("Esiste giÃ  una categoria con questo nome.".to_string());
     }
 
     Ok(())
@@ -1274,7 +1520,7 @@ fn upsert_note(
     let now = now_ns();
     let trimmed_title = title.trim();
     if trimmed_title.is_empty() {
-        return Err("Il titolo della nota non può essere vuoto.".to_string());
+        return Err("Il titolo della nota non puÃ² essere vuoto.".to_string());
     }
 
     let note = if let Some(existing_id) = id.filter(|value| !value.trim().is_empty()) {
@@ -1350,7 +1596,7 @@ fn upsert_postit(
     let now = now_ns();
     let trimmed_color = color.trim();
     if trimmed_color.is_empty() {
-        return Err("Il colore del post-it non può essere vuoto.".to_string());
+        return Err("Il colore del post-it non puÃ² essere vuoto.".to_string());
     }
 
     let postit = if let Some(existing_id) = id.filter(|value| !value.trim().is_empty()) {
@@ -1447,6 +1693,16 @@ fn get_my_vault_counts() -> VaultCountsResponse {
         notes_count: summary_input.notes_count as u64,
         postits_count: summary_input.postits_count as u64,
     }
+}
+
+#[query]
+fn get_my_dashboard_suggestions() -> Vec<DashboardSuggestionRecord> {
+    let owner = match caller() {
+        Ok(owner) => owner,
+        Err(_) => return vec![],
+    };
+
+    build_dashboard_suggestions(owner)
 }
 
 #[update]
@@ -1643,15 +1899,15 @@ fn upsert_document(input: DocumentUpsertInput) -> Result<DocumentRecord, String>
     };
 
     if document.name.is_empty() {
-        return Err("Il nome del documento non può essere vuoto.".to_string());
+        return Err("Il nome del documento non puÃ² essere vuoto.".to_string());
     }
 
     if document.size_bytes == 0 {
-        return Err("Il documento non puÃ² essere vuoto.".to_string());
+        return Err("Il documento non puÃƒÂ² essere vuoto.".to_string());
     }
 
     if document.size_bytes > MAX_DOCUMENT_FILE_BYTES {
-        return Err("Ogni file puÃ² pesare al massimo 5 MB.".to_string());
+        return Err("Ogni file puÃƒÂ² pesare al massimo 5 MB.".to_string());
     }
 
     let next_total_bytes =
@@ -1697,9 +1953,9 @@ async fn generate_my_ai_summary() -> Result<OnchainVaultSummaryResponse, String>
     let compact_json = serde_json::to_string(&summary_input)
         .map_err(|_| "Impossibile preparare il contesto del riepilogo AI.".to_string())?;
 
-    let system_prompt = "Sei un assistente amministrativo per un archivio documentale italiano. Riceverai solo dati strutturati del vault di un utente. Restituisci solo JSON valido con questa forma: {\"summary\": string, \"highlights\": string[]}. Il summary deve essere breve, in italiano, utile e concreto. Gli highlights devono essere massimo 4 punti, ciascuno molto breve. Non inventare dati. Se un importo non è presente, non citarlo.";
+    let system_prompt = "Sei un assistente amministrativo per un archivio documentale italiano. Riceverai solo dati strutturati del vault di un utente. Restituisci solo JSON valido con questa forma: {\"summary\": string, \"highlights\": string[]}. Il summary deve essere breve, in italiano, utile e concreto. Gli highlights devono essere massimo 4 punti, ciascuno molto breve. Non inventare dati. Se un importo non Ã¨ presente, non citarlo.";
     let user_prompt = format!(
-        "Genera un riepilogo operativo del vault dell'utente. Evidenzia solo elementi utili come volumi documenti, categorie prevalenti, importi totali quando presenti, documenti da pagare, fatture, garanzie e attività recenti. Dati strutturati:\n{}",
+        "Genera un riepilogo operativo del vault dell'utente. Evidenzia solo elementi utili come volumi documenti, categorie prevalenti, importi totali quando presenti, documenti da pagare, fatture, garanzie e attivitÃ  recenti. Dati strutturati:\n{}",
         compact_json
     );
 
@@ -1790,7 +2046,7 @@ async fn ask_my_ai_vault(question: String) -> Result<OnchainVaultChatResponse, S
                 .collect::<Vec<_>>()
                 .join(", ");
             format!(
-                "Risultano {} garanzie archiviate nel vault. Le più recenti sono: {}.",
+                "Risultano {} garanzie archiviate nel vault. Le piÃ¹ recenti sono: {}.",
                 summary_input.warranty_documents, titles
             )
         };
@@ -1997,7 +2253,7 @@ async fn ask_my_ai_vault(question: String) -> Result<OnchainVaultChatResponse, S
     let compact_json = serde_json::to_string(&summary_input)
         .map_err(|_| "Impossibile preparare il contesto della chat AI.".to_string())?;
 
-    let system_prompt = "Sei un assistente amministrativo per un archivio documentale italiano. Riceverai solo dati strutturati del vault di un utente e una domanda. Rispondi in italiano, in modo breve e concreto, usando solo i dati disponibili. Se l'informazione non è disponibile, dillo chiaramente. Restituisci solo JSON valido con questa forma: {\"answer\": string}.";
+    let system_prompt = "Sei un assistente amministrativo per un archivio documentale italiano. Riceverai solo dati strutturati del vault di un utente e una domanda. Rispondi in italiano, in modo breve e concreto, usando solo i dati disponibili. Se l'informazione non Ã¨ disponibile, dillo chiaramente. Restituisci solo JSON valido con questa forma: {\"answer\": string}.";
     let user_prompt = format!(
         "Dati strutturati del vault:\n{}\n\nDomanda utente:\n{}",
         compact_json, trimmed_question

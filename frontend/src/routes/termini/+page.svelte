@@ -2,73 +2,87 @@
   <title>Termini di Servizio | Fattura Vault</title>
   <meta
     name="description"
-    content="Termini di servizio di Fattura Vault: uso della beta, limiti del servizio, responsabilità e regole generali."
+    content="Termini di servizio di Fattura Vault per una beta pubblica controllata: accesso, uso consentito, limiti del servizio, AI, responsabilità e modifiche."
   />
 </svelte:head>
 
 <script lang="ts">
   const sections = [
     {
-      title: '1. Natura del servizio',
+      title: '1. Stato del servizio',
       body: [
-        "Fattura Vault è un'applicazione per archiviazione, organizzazione e consultazione di documenti personali e professionali. Alla data attuale il servizio deve essere considerato in fase beta evolutiva.",
-        "Questo significa che funzioni, interfacce, limiti tecnici e componenti AI possono cambiare nel tempo."
+        "Fattura Vault è un'applicazione web per caricare, organizzare, archiviare e consultare documenti personali o professionali.",
+        "Alla data attuale il servizio è offerto come beta pubblica controllata. Questo significa che funzioni, interfacce, limiti tecnici, automazioni e componenti AI possono cambiare nel tempo anche in modo rilevante."
       ]
     },
     {
-      title: '2. Accesso al servizio',
+      title: '2. Accesso e account',
       body: [
-        "L'accesso avviene tramite Internet Identity. L'utente è responsabile della custodia dei propri metodi di accesso, dispositivi autorizzati e strumenti di recupero.",
-        "La perdita dell'accesso a Internet Identity può compromettere l'accesso al proprio archivio."
+        "L'accesso al servizio avviene tramite Internet Identity. L'utente è responsabile della custodia dei propri dispositivi autorizzati, dei metodi di accesso e degli eventuali strumenti di recupero associati a Internet Identity.",
+        "La perdita dell'accesso a Internet Identity può impedire l'accesso al vault. Fattura Vault non può garantire il recupero dell'account se l'identità digitale dell'utente non è più accessibile."
       ]
     },
     {
       title: '3. Uso consentito',
       body: [
         "L'utente si impegna a usare Fattura Vault in modo lecito, corretto e compatibile con la normativa applicabile.",
-        "Non è consentito usare il servizio per caricamento di contenuti illeciti, dannosi, fraudolenti, abusivi o in violazione di diritti altrui."
+        "Non è consentito usare il servizio per caricare o trattare contenuti illeciti, fraudolenti, abusivi, dannosi, diffamatori o che violino diritti di terzi."
       ]
     },
     {
-      title: '4. Limiti tecnici',
+      title: '4. Funzioni beta e continuità del servizio',
       body: [
-        "Il servizio applica limiti operativi per garantire stabilità e sostenibilità. Alla data attuale: massimo 5 MB per file, Inbox temporanea fino a 500 MB per utente, Vault personale fino a 5 GB e chat AI del vault fino a 20 domande al giorno.",
-        "Questi limiti possono cambiare nel tempo."
+        "Durante la fase beta pubblica controllata il servizio può essere soggetto a modifiche, sospensioni, manutenzioni, limiti temporanei o interruzioni non pianificate.",
+        "Non è garantito alcun livello di servizio minimo, alcuna continuità assoluta e alcuna assenza totale di errori o malfunzionamenti."
       ]
     },
     {
-      title: '5. Funzioni AI',
+      title: '5. Limiti tecnici e quote',
       body: [
-        "Le funzioni AI hanno natura assistiva. Il prefill documenti con API personale aiuta a compilare il form ma non sostituisce il controllo dell'utente.",
-        "La chat AI del vault e i riepiloghi AI lavorano sui dati strutturati presenti nell'archivio e possono produrre errori o semplificazioni: l'utente deve sempre verificare le informazioni rilevanti."
+        "Alla data attuale il servizio applica limiti operativi per garantire stabilità e sostenibilità. In particolare: massimo 5 MB per file, Inbox temporanea fino a 500 MB per utente, Vault personale fino a 5 GB e chat AI del vault fino a 20 domande al giorno per account.",
+        "Questi limiti possono cambiare nel tempo per ragioni tecniche, economiche, di sicurezza o di evoluzione del prodotto."
       ]
     },
     {
-      title: '6. Disponibilità e supporto',
+      title: '6. Documento temporaneo e archivio finale',
       body: [
-        "Durante la fase beta non è garantito alcun livello di servizio minimo, continuità assoluta, tempi di risposta prefissati o assenza totale di malfunzionamenti.",
-        "Il supporto viene fornito nei limiti ragionevoli dell'attuale fase di sviluppo."
+        "L'Inbox è un'area temporanea di lavoro e revisione. Il Vault è l'archivio finale dei documenti confermati e organizzati dall'utente.",
+        "L'utente resta responsabile del controllo dei dati prima del salvataggio finale nel Vault, inclusi categoria, importi, date, tag e campi fattura."
       ]
     },
     {
-      title: '7. Responsabilità',
+      title: '7. Funzioni AI',
       body: [
-        "Nei limiti consentiti dalla legge, il gestore del servizio non risponde di danni indiretti, perdita di opportunità, perdita di dati causata da uso improprio del servizio, perdita dell'accesso a Internet Identity o mancata verifica da parte dell'utente dei dati precompilati.",
-        "Resta fermo quanto non può essere escluso o limitato dalla normativa applicabile."
+        "Le funzioni AI hanno natura esclusivamente assistiva. Il prefill documenti può aiutare a compilare alcuni campi, mentre la chat AI e i riepiloghi del vault possono aiutare a leggere meglio i dati archiviati.",
+        "Le funzioni AI possono commettere errori, omissioni, semplificazioni o classificazioni imprecise. L'utente deve verificare sempre le informazioni prima di archiviarle o usarle per decisioni operative, fiscali, amministrative o legali."
       ]
     },
     {
-      title: '8. Sospensione o modifica del servizio',
+      title: '8. Contenuti e responsabilità dell’utente',
       body: [
-        "Il servizio può essere modificato, sospeso o aggiornato per ragioni tecniche, di sicurezza, normative o operative.",
-        "In caso di cambiamenti rilevanti il gestore potrà informare gli utenti con notifiche in-app o aggiornando la documentazione del sito."
+        "L'utente è responsabile dei documenti caricati, delle informazioni inserite manualmente e delle scelte di archiviazione o cancellazione effettuate nel servizio.",
+        "Se il servizio viene usato per documenti sensibili o rilevanti sotto il profilo amministrativo, fiscale o contrattuale, l'utente deve mantenere un livello di controllo, verifica e backup coerente con l'importanza dei propri dati."
       ]
     },
     {
-      title: '9. Versioni e aggiornamenti',
+      title: '9. Limitazione di responsabilità',
       body: [
-        "Questi termini possono essere aggiornati nel tempo. Prima di un'apertura pubblica o commerciale, questa pagina va completata con i dati del soggetto che offre il servizio e con eventuali condizioni economiche o consumer.",
-        "Ultimo aggiornamento: 5 aprile 2026."
+        "Nei limiti consentiti dalla legge, il gestore del servizio non risponde di danni indiretti, perdita di opportunità, interruzioni operative, perdita dell'accesso a Internet Identity, errori di prefill AI, errori di riepilogo AI o uso improprio del servizio.",
+        "Resta fermo quanto non può essere escluso o limitato ai sensi della normativa applicabile."
+      ]
+    },
+    {
+      title: '10. Sospensione, modifica o chiusura della beta',
+      body: [
+        "Il servizio può essere modificato, sospeso, limitato o chiuso per ragioni tecniche, di sicurezza, normative, organizzative o commerciali.",
+        "In caso di cambiamenti rilevanti il gestore può informare gli utenti tramite notifiche in-app, pagina Supporto o aggiornando i documenti legali del sito."
+      ]
+    },
+    {
+      title: '11. Legge applicabile e versione del documento',
+      body: [
+        "Questi termini devono essere completati, prima di un lancio commerciale, con i dati del soggetto offerente, eventuali condizioni economiche e ogni informazione obbligatoria ulteriore richiesta dalla normativa applicabile.",
+        "Ultimo aggiornamento: 6 aprile 2026."
       ]
     }
   ];
@@ -83,7 +97,11 @@
       <p class="mt-5 text-xs font-semibold uppercase tracking-[0.2em] text-[#6a8792]">Documenti legali</p>
       <h1 class="mt-3 text-[2.2rem] font-extrabold tracking-[-0.05em] text-[#103844] sm:text-[3rem]">Termini di Servizio</h1>
       <p class="mt-4 max-w-3xl text-sm leading-7 text-[#5a707a] sm:text-[1.02rem]">
-        Questa pagina definisce le regole base di utilizzo del servizio in fase beta. Prima di un lancio aperto o a pagamento va completata con i dati del soggetto offerente e, se necessario, con condizioni commerciali specifiche.
+        Questa versione dei termini è pensata per una beta pubblica controllata. In questa fase
+        Fattura Vault è offerto come beta pubblica gratuita: il servizio è utilizzabile, ma
+        funzioni, limiti tecnici e componenti AI possono ancora evolvere. Prima di un lancio
+        commerciale o di una distribuzione più ampia, il documento va completato con i dati del
+        soggetto offerente e con eventuali condizioni economiche o consumer.
       </p>
 
       <div class="mt-8 grid gap-5">

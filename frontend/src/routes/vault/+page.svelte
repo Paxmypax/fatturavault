@@ -47,6 +47,7 @@
 	let searchQuery = $state('');
 	let selectedCategory = $state('');
 	let selectedTag = $state('all');
+	let selectedPayment = $state<'all' | 'due' | 'paid'>('all');
 	let selectedDate = $state('');
 	let viewMode = $state<ViewMode>('table');
 	let selectedIds = $state<string[]>([]);
@@ -128,6 +129,14 @@
 			}
 
 			if (selectedTag !== 'all' && !document.tags.includes(selectedTag)) {
+				return false;
+			}
+
+			if (selectedPayment === 'due' && document.paymentStatus !== 'due') {
+				return false;
+			}
+
+			if (selectedPayment === 'paid' && document.paymentStatus !== 'paid') {
 				return false;
 			}
 
@@ -360,6 +369,13 @@
 					</svg>
 					Categorie
 				</a>
+				<a class="mt-3 flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" href="/iva-trimestrale">
+					<svg aria-hidden="true" class="h-6 w-6 shrink-0 text-[#3e5963]" fill="none" viewBox="0 0 24 24">
+	<path d="M4.8 6.8h14.4M7.5 12h9m-11 5.2h13" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+	<path d="M6.2 4h11.6A2.2 2.2 0 0 1 20 6.2v11.6A2.2 2.2 0 0 1 17.8 20H6.2A2.2 2.2 0 0 1 4 17.8V6.2A2.2 2.2 0 0 1 6.2 4Z" stroke="currentColor" stroke-width="1.7" />
+</svg>
+					IVA trimestrale
+				</a>
 			</nav>
 
 			<div class="mt-8 hidden flex-1 lg:block"></div>
@@ -547,6 +563,12 @@
 								{#each availableTags as tag}
 									<option value={tag}>{tag}</option>
 								{/each}
+							</select>
+
+							<select class="min-h-[54px] min-w-[180px] rounded-[1.25rem] border border-[#d7e2e7] bg-white px-4 text-sm font-medium text-[#173843] outline-none" bind:value={selectedPayment}>
+								<option value="all">Tutti i pagamenti</option>
+								<option value="due">Solo da pagare</option>
+								<option value="paid">Solo pagati</option>
 							</select>
 
 							<div class="relative">

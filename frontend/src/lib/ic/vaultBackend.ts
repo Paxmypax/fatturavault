@@ -209,6 +209,15 @@ type RawVaultCountsResponse = {
 	postits_count: bigint;
 };
 
+type RawDashboardSuggestionRecord = {
+	id: string;
+	title: string;
+	body: string;
+	tone: string;
+	cta_label: Nullable<string>;
+	cta_href: Nullable<string>;
+};
+
 type RawNotificationBroadcastRecord = {
 	id: string;
 	title: string;
@@ -297,6 +306,15 @@ export type RemoteVaultCounts = {
 	postitsCount: number;
 };
 
+export type RemoteDashboardSuggestion = {
+	id: string;
+	title: string;
+	body: string;
+	tone: string;
+	ctaLabel?: string;
+	ctaHref?: string;
+};
+
 export type RemoteNotification = {
 	id: string;
 	title: string;
@@ -354,6 +372,7 @@ type VaultBackendActor = {
 	list_my_documents: () => Promise<RawDocumentRecord[]>;
 	list_my_activities: (limit: Nullable<number>) => Promise<RawActivityRecord[]>;
 	get_my_vault_counts: () => Promise<RawVaultCountsResponse>;
+	get_my_dashboard_suggestions: () => Promise<RawDashboardSuggestionRecord[]>;
 	cleanup_my_orphan_documents: () => Promise<bigint>;
 	list_my_notifications: () => Promise<RawNotificationViewRecord[]>;
 	get_my_notification_access_state: () => Promise<RawNotificationAccessState>;
@@ -574,6 +593,14 @@ function idlFactory({ IDL: idl }: { IDL: any }) {
 		notes_count: idl.Nat64,
 		postits_count: idl.Nat64
 	});
+	const DashboardSuggestionRecord = idl.Record({
+		id: idl.Text,
+		title: idl.Text,
+		body: idl.Text,
+		tone: idl.Text,
+		cta_label: idl.Opt(idl.Text),
+		cta_href: idl.Opt(idl.Text)
+	});
 	const NotificationBroadcastRecord = idl.Record({
 		id: idl.Text,
 		title: idl.Text,
@@ -639,6 +666,7 @@ function idlFactory({ IDL: idl }: { IDL: any }) {
 		list_my_documents: idl.Func([], [idl.Vec(DocumentRecord)], []),
 		list_my_activities: idl.Func([idl.Opt(idl.Nat32)], [idl.Vec(ActivityRecord)], []),
 		get_my_vault_counts: idl.Func([], [VaultCountsResponse], []),
+		get_my_dashboard_suggestions: idl.Func([], [idl.Vec(DashboardSuggestionRecord)], ['query']),
 		cleanup_my_orphan_documents: idl.Func([], [idl.Nat64], []),
 		list_my_notifications: idl.Func([], [idl.Vec(NotificationViewRecord)], []),
 		get_my_notification_access_state: idl.Func([], [NotificationAccessState], []),
@@ -1336,6 +1364,23 @@ export async function fetchRemoteVaultCounts(): Promise<RemoteVaultCounts | null
 		notesCount: Number(counts.notes_count),
 		postitsCount: Number(counts.postits_count)
 	};
+}
+
+export async function fetchRemoteDashboardSuggestions(): Promise<RemoteDashboardSuggestion[] | null> {
+	const actor = await getActor();
+	if (!actor) {
+		return null;
+	}
+
+	const suggestions = await actor.get_my_dashboard_suggestions();
+	return suggestions.map((suggestion) => ({
+		id: suggestion.id,
+		title: suggestion.title,
+		body: suggestion.body,
+		tone: suggestion.tone,
+		ctaLabel: optionToUndefined(suggestion.cta_label),
+		ctaHref: optionToUndefined(suggestion.cta_href)
+	}));
 }
 
 export async function cleanupRemoteOrphanDocuments(): Promise<number | null> {

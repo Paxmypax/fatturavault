@@ -111,6 +111,9 @@
           Archivia, gestisci e organizza i tuoi file con la massima sicurezza e trasparenza della
           Blockchain.
         </p>
+        <p class="mt-4 inline-flex rounded-full border border-[#d7e1e8] bg-white/80 px-4 py-2 text-sm font-semibold text-[#0f5d6c] shadow-[0_10px_25px_rgba(148,163,184,0.1)]">
+          Beta pubblica gratuita
+        </p>
 
         <div class="mt-10 flex flex-col items-start gap-4 sm:flex-row sm:items-center sm:gap-6">
           <button
@@ -186,6 +189,11 @@
             L'intelligenza artificiale in Fattura Vault ti aiuta a lavorare più velocemente con i documenti.
             Può precompilare parte dei campi quando carichi un file in Inbox e, una volta archiviato,
             aiutarti a leggere meglio il tuo vault con riepiloghi e domande sui dati già salvati.
+          </p>
+          <p>
+            In questa fase il servizio è disponibile come beta pubblica gratuita: puoi provarlo
+            liberamente, ma alcune funzioni, limiti tecnici e dettagli dell'esperienza possono
+            ancora evolvere.
           </p>
         </div>
       </article>

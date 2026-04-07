@@ -425,6 +425,16 @@ pub struct OnchainVaultChatResponse {
 }
 
 #[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
+pub struct DashboardSuggestionRecord {
+    pub id: String,
+    pub title: String,
+    pub body: String,
+    pub tone: String,
+    pub cta_label: Option<String>,
+    pub cta_href: Option<String>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug, PartialEq, Eq)]
 pub enum BlobKind {
     Original,
     Preview,

@@ -2,7 +2,7 @@
   <title>Informativa AI e Cookie | Fattura Vault</title>
   <meta
     name="description"
-    content="Informativa su funzioni AI, cookie e tecnologie simili in Fattura Vault."
+    content="Informativa su AI, cookie e tecnologie tecniche in Fattura Vault: prefill documenti, AI on-chain e uso di strumenti tecnici."
   />
 </svelte:head>
 
@@ -11,17 +11,22 @@
     {
       question: 'Il prefill documenti usa la mia API personale?',
       answer:
-        "Sì. Il prefill documenti è opzionale e usa la chiave API personale inserita dall'utente in Impostazioni. Se non attivi la funzione, il form resta manuale."
+        "Sì. Il prefill documenti è opzionale e usa la chiave API personale inserita dall'utente in Impostazioni. Se la funzione non viene attivata, il form resta manuale."
     },
     {
       question: "L'LLM on-chain ICP legge i miei PDF o le mie immagini?",
       answer:
-        "No. In Fattura Vault l'LLM on-chain ICP è pensato per lavorare su testo e dati strutturati già presenti nel vault, ad esempio riepiloghi e chat sui dati archiviati. Non sostituisce il prefill documenti con API personale."
+        "No. In Fattura Vault l'LLM on-chain ICP è pensato per lavorare su testo, numeri, date e dati strutturati già presenti nel vault, per esempio nella chat AI o nei riepiloghi. Non sostituisce il prefill documenti con API personale."
     },
     {
-      question: 'Usate cookie di profilazione o marketing?',
+      question: 'Usate cookie di marketing o profilazione?',
       answer:
-        "Allo stato attuale il servizio è pensato per usare solo elementi tecnici e funzionali necessari al funzionamento dell'app. Prima di introdurre strumenti ulteriori di marketing o profilazione serve una valutazione dedicata e, se necessario, un meccanismo di consenso."
+        "Alla data attuale il servizio è progettato per usare principalmente strumenti tecnici e funzionali necessari al funzionamento dell'app. Prima di introdurre strumenti ulteriori di marketing o profilazione serve una valutazione dedicata e, se necessario, un meccanismo di consenso."
+    },
+    {
+      question: 'I risultati AI sono vincolanti o automatici?',
+      answer:
+        "No. Le funzioni AI hanno natura assistiva. L'utente deve verificare sempre i dati precompilati, i riepiloghi e le risposte della chat prima di archiviarli o usarli per decisioni operative."
     }
   ];
 </script>
@@ -45,7 +50,7 @@
             L'LLM on-chain ICP è separato dal prefill: serve per riepiloghi e chat sui dati strutturati già presenti nel vault. In questa fase usa il modello Llama 3.1 8B tramite l'infrastruttura on-chain di ICP.
           </p>
           <p>
-            Le funzioni AI hanno sempre natura assistiva. L'utente deve verificare i risultati prima di archiviare documenti o prendere decisioni operative.
+            Le funzioni AI hanno sempre natura assistiva. L'utente deve verificare i risultati prima di archiviare documenti o prendere decisioni operative, fiscali o amministrative.
           </p>
         </div>
       </section>
@@ -57,7 +62,7 @@
             Fattura Vault usa principalmente elementi tecnici necessari al funzionamento dell'app, come sessioni, preferenze locali del browser, stato UI, cache operative e configurazioni salvate sul dispositivo dell'utente.
           </p>
           <p>
-            Alla data attuale il servizio non è progettato per basarsi su cookie di marketing o profilazione. Se in futuro verranno introdotti strumenti di tracciamento non tecnici, la relativa informativa e gli eventuali meccanismi di consenso dovranno essere aggiornati.
+            Alla data attuale il servizio non è progettato per basarsi su cookie di marketing o profilazione. Se in futuro verranno introdotti strumenti di tracciamento non tecnici, questa informativa e gli eventuali meccanismi di consenso dovranno essere aggiornati.
           </p>
         </div>
       </section>

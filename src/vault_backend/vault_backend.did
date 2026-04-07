@@ -222,6 +222,15 @@ type VaultCountsResponse = record {
   postits_count : nat64;
 };
 
+type DashboardSuggestionRecord = record {
+  id : text;
+  title : text;
+  body : text;
+  tone : text;
+  cta_label : opt text;
+  cta_href : opt text;
+};
+
 type NotificationAccessState = record {
   can_publish : bool;
   has_admins : bool;
@@ -260,6 +269,7 @@ service : {
   list_my_documents : () -> (vec DocumentRecord) query;
   list_my_activities : (opt nat32) -> (vec ActivityRecord) query;
   get_my_vault_counts : () -> (VaultCountsResponse);
+  get_my_dashboard_suggestions : () -> (vec DashboardSuggestionRecord) query;
   cleanup_my_orphan_documents : () -> (nat64);
   list_my_notifications : () -> (vec NotificationViewRecord);
   get_my_notification_access_state : () -> (NotificationAccessState);

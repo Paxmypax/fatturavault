@@ -9,8 +9,10 @@
 	} from '$lib/auth';
 	import {
 		askRemoteAiVault,
+		fetchRemoteDashboardSuggestions,
 		fetchRemoteVaultCounts,
 		generateRemoteAiVaultSummary,
+		type RemoteDashboardSuggestion,
 		type RemoteAiVaultChatAnswer,
 		type RemoteAiVaultSummary,
 		type RemoteVaultCounts
@@ -21,6 +23,11 @@
 	import { categoriesState, getCategoryByName, initCategories } from '$lib/stores/categories';
 	import { initVault, vaultState } from '$lib/vault';
 	import { onMount } from 'svelte';
+
+	type DashboardSuggestionView = RemoteDashboardSuggestion & {
+		id: string;
+		ctaAction?: 'open-postits';
+	};
 
 	onMount(async () => {
 		await initAuth();
@@ -40,6 +47,7 @@
 		initPostIts();
 		void initAnalyticsAccess();
 		void refreshVaultCounts();
+		void refreshDashboardSuggestions();
 	});
 
 	let displayNameInput = $state('');
@@ -50,6 +58,9 @@
 	let aiSummaryError = $state('');
 	let aiSummary = $state<RemoteAiVaultSummary | null>(null);
 	let vaultCounts = $state<RemoteVaultCounts | null>(null);
+	let dashboardSuggestions = $state<RemoteDashboardSuggestion[]>([]);
+	let dashboardSuggestionsPending = $state(false);
+	let dashboardSuggestionsError = $state('');
 	let aiQuestion = $state('');
 	let aiChatPending = $state(false);
 	let aiChatError = $state('');
@@ -205,6 +216,42 @@
 		}
 	}
 
+	async function refreshDashboardSuggestions() {
+		dashboardSuggestionsPending = true;
+		dashboardSuggestionsError = '';
+		try {
+			dashboardSuggestions = (await fetchRemoteDashboardSuggestions()) ?? [];
+		} catch (error) {
+			dashboardSuggestions = [];
+			dashboardSuggestionsError =
+				error instanceof Error
+					? error.message
+					: 'Impossibile caricare i suggerimenti del vault.';
+		} finally {
+			dashboardSuggestionsPending = false;
+		}
+	}
+
+	function suggestionToneClasses(tone: string) {
+		switch (tone) {
+			case 'warning':
+				return {
+					panel: 'border-[#f5d6a3] bg-[#fff8eb]',
+					badge: 'bg-[#fff0cc] text-[#9a5b00]'
+				};
+			case 'positive':
+				return {
+					panel: 'border-[#cfe7d8] bg-[#f2fbf5]',
+					badge: 'bg-[#dcf5e4] text-[#1d6b3a]'
+				};
+			default:
+				return {
+					panel: 'border-[#d8e8ed] bg-[#eef8fa]',
+					badge: 'bg-[#dff1f3] text-[#0f5d6c]'
+				};
+		}
+	}
+
 	async function handleAskAiVault() {
 		if (!aiQuestion.trim()) {
 			aiChatError = 'Scrivi una domanda per la chat AI.';
@@ -234,6 +281,42 @@
 			return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
 		})
 	);
+
+	const pendingPostIts = $derived(orderedPostIts.filter((note) => !note.completed));
+
+	const localPostItSuggestion = $derived.by<DashboardSuggestionView | null>(() => {
+		if (!pendingPostIts.length) {
+			return null;
+		}
+
+		const preview = pendingPostIts
+			.slice(0, 2)
+			.map((note) => `"${note.text}"`)
+			.join(' e ');
+
+		const body =
+			pendingPostIts.length === 1
+				? `Hai un promemoria aperto nei post-it: ${preview}.`
+				: `Hai ${pendingPostIts.length} promemoria aperti nei post-it. I primi da ricordare sono ${preview}.`;
+
+		return {
+			id: 'postits-reminder',
+			title: pendingPostIts.length === 1 ? 'Hai un post-it da ricordare' : 'Hai post-it ancora aperti',
+			body,
+			tone: 'warning',
+			ctaLabel: 'Apri post-it',
+			ctaHref: '',
+			ctaAction: 'open-postits'
+		};
+	});
+
+	const visibleDashboardSuggestions = $derived<DashboardSuggestionView[]>([
+		...(localPostItSuggestion ? [localPostItSuggestion] : []),
+		...dashboardSuggestions.map((suggestion, index) => ({
+			...suggestion,
+			id: `remote-${index}`
+		}))
+	]);
 
 	const processedDocuments = $derived(
 		[...$vaultState.documents]
@@ -326,6 +409,13 @@
 						<path d="M9.2 7H19M9.2 17H19M3 12h10" stroke="currentColor" stroke-linecap="round" stroke-width="1.7" />
 					</svg>
 					Categorie
+				</a>
+				<a class="mt-3 flex w-full items-center gap-3 rounded-2xl px-4 py-4 text-left text-lg font-medium text-[#29414a] transition-colors hover:bg-white/70" href="/iva-trimestrale">
+					<svg aria-hidden="true" class="h-6 w-6 shrink-0 text-[#3e5963]" fill="none" viewBox="0 0 24 24">
+	<path d="M4.8 6.8h14.4M7.5 12h9m-11 5.2h13" stroke="currentColor" stroke-linecap="round" stroke-width="1.8" />
+	<path d="M6.2 4h11.6A2.2 2.2 0 0 1 20 6.2v11.6A2.2 2.2 0 0 1 17.8 20H6.2A2.2 2.2 0 0 1 4 17.8V6.2A2.2 2.2 0 0 1 6.2 4Z" stroke="currentColor" stroke-width="1.7" />
+</svg>
+					IVA trimestrale
 				</a>
 			</nav>
 
@@ -449,6 +539,67 @@
 								</div>
 							</div>
 						</div>
+
+						<section class="mt-6 rounded-[2rem] border border-white/85 bg-white/76 p-5 shadow-[0_20px_50px_rgba(148,163,184,0.14)] backdrop-blur sm:p-6">
+							<div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+								<div>
+									<p class="text-xs font-semibold uppercase tracking-[0.2em] text-[#6a8792]">Suggerimenti intelligenti</p>
+									<h2 class="mt-2 text-2xl font-bold tracking-[-0.04em] text-[#103844]">Cose utili da controllare oggi</h2>
+									<p class="mt-2 text-sm leading-6 text-[#5c727c]">
+										Indicazioni operative costruite sui dati reali del tuo vault: pagamenti, scadenze, ordine dell'archivio e spese ricorrenti.
+									</p>
+								</div>
+								<button
+									class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#d7e1e8] bg-white px-4 text-sm font-semibold text-[#173843] transition-transform hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+									type="button"
+									onclick={refreshDashboardSuggestions}
+									disabled={dashboardSuggestionsPending}
+								>
+									{dashboardSuggestionsPending ? 'Aggiorno...' : 'Aggiorna suggerimenti'}
+								</button>
+							</div>
+
+							{#if dashboardSuggestionsError}
+								<div class="mt-5 rounded-[1.4rem] border border-[#f1c7c7] bg-[#fff5f5] px-4 py-3 text-sm leading-6 text-[#8f4040]">
+									{dashboardSuggestionsError}
+								</div>
+							{/if}
+
+							{#if dashboardSuggestionsPending && !visibleDashboardSuggestions.length}
+								<div class="mt-5 rounded-[1.6rem] border border-[#d8e8ed] bg-[#eef8fa] px-4 py-4 text-sm leading-6 text-[#22505d]">
+									Sto rileggendo il vault per preparare i suggerimenti di oggi.
+								</div>
+							{:else if visibleDashboardSuggestions.length}
+								<div class="mt-5 grid gap-4 xl:grid-cols-2">
+									{#each visibleDashboardSuggestions as suggestion (suggestion.id)}
+										{@const toneClasses = suggestionToneClasses(suggestion.tone)}
+										<div class={`rounded-[1.5rem] border px-5 py-5 shadow-[0_12px_28px_rgba(148,163,184,0.10)] ${toneClasses.panel}`}>
+											<span class={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${toneClasses.badge}`}>
+												{suggestion.tone === 'warning' ? 'Attenzione' : suggestion.tone === 'positive' ? 'In ordine' : 'Focus'}
+											</span>
+											<h3 class="mt-3 text-lg font-bold tracking-[-0.03em] text-[#173843]">{suggestion.title}</h3>
+											<p class="mt-3 text-sm leading-6 text-[#35535d]">{suggestion.body}</p>
+											{#if suggestion.ctaAction === 'open-postits' && suggestion.ctaLabel}
+												<button
+													class="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe0e5] bg-white px-4 text-sm font-semibold text-[#173843] transition-transform hover:-translate-y-0.5"
+													type="button"
+													onclick={() => (showPostItPanel = true)}
+												>
+													{suggestion.ctaLabel}
+												</button>
+											{:else if suggestion.ctaLabel && suggestion.ctaHref}
+												<a
+													class="mt-4 inline-flex min-h-11 items-center justify-center rounded-2xl border border-[#cfe0e5] bg-white px-4 text-sm font-semibold text-[#173843] transition-transform hover:-translate-y-0.5"
+													href={suggestion.ctaHref}
+												>
+													{suggestion.ctaLabel}
+												</a>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							{/if}
+						</section>
 
 						<section class="mt-6 rounded-[2rem] border border-white/85 bg-[linear-gradient(135deg,rgba(12,92,107,0.08),rgba(255,255,255,0.88))] p-5 shadow-[0_20px_50px_rgba(148,163,184,0.14)] backdrop-blur sm:p-6">
 							<div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
