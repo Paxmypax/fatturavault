@@ -209,6 +209,101 @@
 		return String(value);
 	}
 
+	function parseIsoDate(value: string | undefined | null) {
+		if (!value) return null;
+		const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value.trim());
+		if (!match) return null;
+		const [, year, month, day] = match;
+		const date = new Date(Date.UTC(Number(year), Number(month) - 1, Number(day)));
+		return Number.isNaN(date.getTime()) ? null : date;
+	}
+
+	function formatCalendarDate(date: Date) {
+		const year = date.getUTCFullYear();
+		const month = `${date.getUTCMonth() + 1}`.padStart(2, '0');
+		const day = `${date.getUTCDate()}`.padStart(2, '0');
+		return `${year}${month}${day}`;
+	}
+
+	function addUtcDays(date: Date, days: number) {
+		const result = new Date(date.getTime());
+		result.setUTCDate(result.getUTCDate() + days);
+		return result;
+	}
+
+	function buildCalendarEventTitle() {
+		const fallbackTitle = title.trim() || document.title || document.name;
+		const referenceName = merchantName.trim() || fallbackTitle;
+
+		if (showWarrantyFields || categoryName === 'Garanzia') {
+			return `Scadenza garanzia: ${referenceName}`;
+		}
+
+		if (hasExpiry) {
+			return `Scadenza documento: ${referenceName}`;
+		}
+
+		return `Pagare: ${referenceName}`;
+	}
+
+	function buildCalendarEventDescription() {
+		const lines = [
+			`Documento: ${title.trim() || document.title || document.name}`,
+			`Categoria: ${categoryName}`
+		];
+
+		if (merchantName.trim()) {
+			lines.push(`Fornitore: ${merchantName.trim()}`);
+		}
+
+		const parsedAmount = parseAmount(amount);
+		if (parsedAmount != null) {
+			lines.push(`Importo: EUR ${parsedAmount.toFixed(2)}`);
+		}
+
+		if (documentDate) {
+			lines.push(`Data documento: ${documentDate}`);
+		}
+
+		if (hasExpiry && expiryDate) {
+			lines.push(`Scadenza: ${expiryDate}`);
+		}
+
+		lines.push('Promemoria creato da Fattura Vault');
+		return lines.join('\n');
+	}
+
+	let googleCalendarEventDate = $derived.by(() => {
+		if (hasExpiry) {
+			return parseIsoDate(expiryDate);
+		}
+
+		if (paymentStatus === 'due') {
+			return parseIsoDate(expiryDate || documentDate);
+		}
+
+		return null;
+	});
+
+	let shouldShowGoogleCalendar = $derived(
+		Boolean(googleCalendarEventDate) && (hasExpiry || paymentStatus === 'due')
+	);
+
+	function openGoogleCalendarReminder() {
+		if (!browser || !googleCalendarEventDate) {
+			return;
+		}
+
+		const startDate = formatCalendarDate(googleCalendarEventDate);
+		const endDate = formatCalendarDate(addUtcDays(googleCalendarEventDate, 1));
+		const url = new URL('https://calendar.google.com/calendar/render');
+		url.searchParams.set('action', 'TEMPLATE');
+		url.searchParams.set('text', buildCalendarEventTitle());
+		url.searchParams.set('dates', `${startDate}/${endDate}`);
+		url.searchParams.set('details', buildCalendarEventDescription());
+		window.open(url.toString(), '_blank', 'noopener,noreferrer');
+	}
+
 	function getPlainInvoiceData(): InvoiceData {
 		return {
 			...invoiceData,
@@ -613,7 +708,7 @@
 		{/if}
 	{/if}
 
-	<div class="flex gap-3">
+	<div class="flex flex-wrap gap-3">
 		{#if isEditing}
 			<button type="button" class="flex-1 rounded-2xl bg-[#c8a96e] px-5 py-3 text-sm font-bold text-white shadow-[0_18px_40px_rgba(200,169,110,0.3)] transition-transform hover:-translate-y-0.5 disabled:opacity-50" onclick={handleSave} disabled={!title.trim() || isSaving}>
 				{isSaving ? 'Sto archiviando...' : 'Salva e archivia'}
@@ -621,6 +716,16 @@
 		{:else}
 			<button type="button" class="flex-1 rounded-2xl border border-[#d6e2e7] bg-white px-5 py-3 text-sm font-semibold text-[#173843] transition-colors hover:bg-[#f6fafb]" onclick={handleEdit}>
 				Modifica
+			</button>
+		{/if}
+
+		{#if shouldShowGoogleCalendar}
+			<button
+				type="button"
+				class="rounded-2xl border border-[#d7e1e8] bg-white px-4 py-3 text-sm font-semibold text-[#173843] transition-colors hover:bg-[#f6fafb]"
+				onclick={openGoogleCalendarReminder}
+			>
+				Aggiungi a Google Calendar
 			</button>
 		{/if}
 
