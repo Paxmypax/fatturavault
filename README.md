@@ -4,23 +4,26 @@
 
 Fattura Vault is a document vault for invoices and personal documents built on the Internet Computer.
 
-It lets users:
+- Live beta: [fatturavault.com](https://fatturavault.com)
+- Current UI language: Italian
+- Repository goal: transparency, architecture visibility, and community review
 
-- upload files into a temporary Inbox
-- review and organize documents before archiving
-- store documents in a final Vault
-- categorize, tag, annotate, and track expiry or payment status
-- use AI-assisted prefill for document cataloging
-- query structured Vault data with on-chain AI summaries and chat
+## What it does
 
-The current public beta UI is in Italian.
+- Upload files into a temporary Inbox
+- Review and organize documents before archiving
+- Store documents in a final Vault
+- Categorize, tag, annotate, and track expiry or payment status
+- Use AI-assisted prefill for document cataloging
+- Query structured Vault data with on-chain AI summaries and chat
+- Calculate quarterly VAT locally in the browser from CSV exports
 
 ## Current status
 
-- public beta
-- active development
-- open code for transparency
-- no independent security audit published yet
+- Public beta
+- Active development
+- Open code for transparency
+- No independent security audit published yet
 
 ## Tech stack
 
@@ -36,7 +39,7 @@ The current public beta UI is in Italian.
 - `vault_inbox`
   - temporary workspace for uploaded files
 - `vault_backend`
-  - metadata, categories, notes, dashboard logic, AI chat/summaries
+  - metadata, categories, notes, dashboard logic, suggestions, AI chat/summaries
 - `vault_storage`
   - encrypted file blob storage
 - `vault_analytics`
@@ -78,7 +81,7 @@ Frontend environment variables are local-only and should not be committed. Use:
 
 - `frontend/.env.example`
 
-as a starting point for your own local configuration.
+as a starting point for your local configuration.
 
 ## Important notes
 
@@ -86,7 +89,10 @@ as a starting point for your own local configuration.
 - Fattura Vault handles potentially sensitive documents, so users should verify AI-generated fields before archiving.
 - Open source improves transparency, but it does not replace independent review or audit.
 
-## Additional documentation
+## Documentation
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md)
-- [SECURITY.md](./SECURITY.md)
+- [Architecture overview](./ARCHITECTURE.md)
+- [Security policy](./SECURITY.md)
+- [Italian README](./README.it.md)
+- [Italian architecture overview](./ARCHITECTURE.it.md)
+- [Italian security policy](./SECURITY.it.md)

@@ -4,23 +4,26 @@ Italiano | [English](./README.md)
 
 Fattura Vault e` un vault documentale per fatture e documenti personali costruito su Internet Computer.
 
-Permette agli utenti di:
+- Beta live: [fatturavault.com](https://fatturavault.com)
+- Lingua attuale dell'interfaccia: italiano
+- Obiettivo del repository: trasparenza, visibilita` architetturale e revisione da parte della community
 
-- caricare file in una Inbox temporanea
-- rivedere e organizzare i documenti prima dell'archiviazione
-- salvare i documenti nel Vault finale
-- categorizzare, taggare, annotare e tracciare scadenze o stato di pagamento
-- usare un prefill assistito dall'AI durante la catalogazione
-- interrogare i dati strutturati del Vault con riepiloghi e chat AI on-chain
+## Cosa fa
 
-L'interfaccia della beta pubblica e` attualmente in italiano.
+- Carica file in una Inbox temporanea
+- Rivede e organizza i documenti prima dell'archiviazione
+- Salva i documenti nel Vault finale
+- Categorizza, tagga, annota e traccia scadenze o stato di pagamento
+- Usa un prefill assistito dall'AI durante la catalogazione
+- Interroga i dati strutturati del Vault con riepiloghi e chat AI on-chain
+- Calcola l'IVA trimestrale localmente nel browser a partire da CSV
 
 ## Stato attuale
 
-- beta pubblica
-- sviluppo attivo
-- codice aperto per trasparenza
-- nessun audit di sicurezza indipendente pubblicato al momento
+- Beta pubblica
+- Sviluppo attivo
+- Codice aperto per trasparenza
+- Nessun audit di sicurezza indipendente pubblicato al momento
 
 ## Stack tecnico
 
@@ -36,7 +39,7 @@ L'interfaccia della beta pubblica e` attualmente in italiano.
 - `vault_inbox`
   - area temporanea per i file caricati
 - `vault_backend`
-  - metadati, categorie, note, logica dashboard, chat/riepiloghi AI
+  - metadati, categorie, note, logica dashboard, suggerimenti, chat/riepiloghi AI
 - `vault_storage`
   - storage dei blob file cifrati
 - `vault_analytics`
@@ -86,7 +89,10 @@ come base di partenza per la tua configurazione locale.
 - Fattura Vault gestisce documenti potenzialmente sensibili, quindi i campi generati dall'AI vanno sempre verificati prima dell'archiviazione.
 - L'open source migliora la trasparenza, ma non sostituisce una revisione o un audit indipendente.
 
-## Documentazione aggiuntiva
+## Documentazione
 
-- [ARCHITECTURE.it.md](./ARCHITECTURE.it.md)
-- [SECURITY.it.md](./SECURITY.it.md)
+- [Panoramica architetturale](./ARCHITECTURE.it.md)
+- [Informativa di sicurezza](./SECURITY.it.md)
+- [README inglese](./README.md)
+- [Architecture overview](./ARCHITECTURE.md)
+- [Security policy](./SECURITY.md)
