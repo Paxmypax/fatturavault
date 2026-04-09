@@ -1,4 +1,0 @@
-cd "C:\Users\Luigi\Desktop\icp fatture\fatturavault\icp-monitor"
-npm run dev
- 
-anteprima http://127.0.0.1:4180

@@ -11,4 +11,17 @@ frontend/vite-dev.err.log
 .DS_Store
 Thumbs.db
 .tmp-empty.did
+Cargo.lock
 *.zip
+
+# Internal project notes not intended for the public repository
+GESTIONE-ICP.md
+RESET-INFO.md
+ANALYTICS-ICP.md
+INBOX-AI-TEMPORANEA.md
+BACKEND-ICP-MODELLO-DATI.md
+CIFRATURA-CLIENT-SIDE.md
+SICUREZZA-UTENTE.md
+NOTE-ARCHITETTURA-STORAGE-EVOLUTIVO.md
+icp-monitor/
+frontend/scripts/check-staging-cycles.ps1
