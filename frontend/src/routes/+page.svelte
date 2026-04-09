@@ -1,9 +1,26 @@
 ﻿<svelte:head>
-  <title>FatturaVault</title>
+  <title>Fattura Vault</title>
   <meta
     content="Il tuo cassetto digitale sicuro per fatture e documenti importanti."
     name="description"
   />
+  <meta content="Fattura Vault" property="og:site_name" />
+  <meta content="Fattura Vault" property="og:title" />
+  <meta
+    content="Il tuo cassetto digitale sicuro per fatture e documenti importanti."
+    property="og:description"
+  />
+  <meta content="website" property="og:type" />
+  <meta content="https://fatturavault.com" property="og:url" />
+  <meta content="https://fatturavault.com/og-image.png" property="og:image" />
+  <meta content="it_IT" property="og:locale" />
+  <meta content="summary_large_image" name="twitter:card" />
+  <meta content="Fattura Vault" name="twitter:title" />
+  <meta
+    content="Il tuo cassetto digitale sicuro per fatture e documenti importanti."
+    name="twitter:description"
+  />
+  <meta content="https://fatturavault.com/og-image.png" name="twitter:image" />
   <link href="https://fonts.googleapis.com" rel="preconnect" />
   <link crossorigin="anonymous" href="https://fonts.gstatic.com" rel="preconnect" />
   <link
