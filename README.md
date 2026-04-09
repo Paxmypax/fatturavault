@@ -1,5 +1,7 @@
 # Fattura Vault
 
+[Italiano](./README.it.md) | English
+
 Fattura Vault is a document vault for invoices and personal documents built on the Internet Computer.
 
 It lets users:
@@ -88,4 +90,3 @@ as a starting point for your own local configuration.
 
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [SECURITY.md](./SECURITY.md)
-- [NOTE-ARCHITETTURA-STORAGE-EVOLUTIVO.md](./NOTE-ARCHITETTURA-STORAGE-EVOLUTIVO.md)
